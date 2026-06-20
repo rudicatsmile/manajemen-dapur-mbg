@@ -18,8 +18,7 @@
     "noUnusedLocals": false,
     "noUnusedParameters": false,
     "paths": {
-      "@/*": ["./src/*"],
-      "@mbg/shared": ["../shared/src"]
+      "@/*": ["./src/*"]
     }
   },
   "include": ["src/**/*"],
