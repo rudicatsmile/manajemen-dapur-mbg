@@ -1,6 +1,6 @@
 # Manual Book — Manajemen Dapur MBG
 
-**Versi**: 1.0
+**Versi**: 1.1
 **Terakhir Diperbarui**: 20 Juni 2026
 
 ---
@@ -27,6 +27,23 @@
    - 2.6 [Trigger Alert Manual (Admin)](#26-trigger-alert-manual-admin)
    - 2.7 [Siapa Menerima Notifikasi Apa?](#27-siapa-menerima-notifikasi-apa)
    - 2.8 [FAQ Notification System](#28-faq-notification-system)
+3. [Supplier Rating & Scorecard](#3-supplier-rating--scorecard)
+   - 3.1 [Tentang Supplier Rating](#31-tentang-supplier-rating)
+   - 3.2 [4 Kriteria Penilaian](#32-4-kriteria-penilaian)
+   - 3.3 [Cara Mengakses](#33-cara-mengakses)
+   - 3.4 [Halaman Ranking Supplier](#34-halaman-ranking-supplier)
+   - 3.5 [Halaman Detail Supplier](#35-halaman-detail-supplier)
+   - 3.6 [Mengambil Keputusan Berdasarkan Rating](#36-mengambil-keputusan-berdasarkan-rating)
+   - 3.7 [Tips & Best Practices](#37-tips--best-practices)
+   - 3.8 [FAQ Supplier Rating](#38-faq-supplier-rating)
+4. [Histori & Alert Harga Bahan](#4-histori--alert-harga-bahan)
+   - 4.1 [Tentang Histori Harga](#41-tentang-histori-harga)
+   - 4.2 [Cara Data Harga Terkumpul](#42-cara-data-harga-terkumpul)
+   - 4.3 [Halaman Histori & Alert Harga](#43-halaman-histori--alert-harga)
+   - 4.4 [Halaman Detail Harga Item](#44-halaman-detail-harga-item)
+   - 4.5 [Alert Harga Otomatis](#45-alert-harga-otomatis)
+   - 4.6 [Strategi Berdasarkan Data Harga](#46-strategi-berdasarkan-data-harga)
+   - 4.7 [FAQ Histori Harga](#47-faq-histori-harga)
 
 ---
 
@@ -417,6 +434,457 @@ A: Tidak ada limit. Namun, notifikasi ditampilkan dengan pagination (20 per hala
 
 ---
 
+## 3. Supplier Rating & Scorecard
+
+### 3.1 Tentang Supplier Rating
+
+Supplier Rating adalah fitur yang memberikan **skor performa otomatis** kepada setiap supplier berdasarkan data transaksi historis. Bukan berdasarkan perasaan atau preferensi pribadi, tapi berdasarkan fakta: apakah barang datang tepat waktu? Apakah jumlahnya sesuai? Apakah harganya kompetitif?
+
+**Manfaat utama:**
+- Memilih supplier terbaik berdasarkan data, bukan feeling
+- Mendeteksi supplier yang performanya menurun
+- Negosiasi lebih kuat — data performa sebagai bahan diskusi
+- Keputusan ganti supplier berbasis bukti
+
+### 3.2 4 Kriteria Penilaian
+
+Setiap supplier dinilai berdasarkan 4 kriteria dengan bobot berbeda:
+
+| # | Kriteria | Bobot | Yang Diukur | Sumber Data |
+|---|----------|-------|-------------|-------------|
+| 1 | **Ketepatan Waktu** | 30% | Apakah barang dikirim sesuai tanggal yang dijanjikan? | Tanggal terima (Receiving) vs tanggal harapan (PO expectedDate) |
+| 2 | **Kelengkapan Pesanan** | 25% | Apakah jumlah barang yang diterima sesuai pesanan? | Qty diterima (receivedQty) vs qty dipesan (quantity) pada PO |
+| 3 | **Kualitas Barang** | 25% | Seberapa rendah tingkat waste dari barang supplier ini? | Data waste record yang terkait item dari supplier |
+| 4 | **Harga Kompetitif** | 20% | Apakah harga supplier ini lebih murah dari rata-rata pasar? | Perbandingan harga per item vs supplier lain |
+
+**Skala skor: 1 sampai 5**
+
+| Skor | Arti | Warna |
+|------|------|-------|
+| 4.0 – 5.0 | Sangat Baik | Hijau |
+| 3.0 – 3.9 | Cukup | Kuning |
+| 1.0 – 2.9 | Perlu Perhatian | Merah |
+
+**Cara konversi persentase ke skor (contoh Ketepatan Waktu):**
+
+| Persentase On-Time | Skor |
+|--------------------|------|
+| 81% – 100% | 5 |
+| 61% – 80% | 4 |
+| 41% – 60% | 3 |
+| 21% – 40% | 2 |
+| 0% – 20% | 1 |
+
+**Skor Keseluruhan** = (Ketepatan Waktu × 0.30) + (Kelengkapan × 0.25) + (Kualitas × 0.25) + (Harga × 0.20)
+
+### 3.3 Cara Mengakses
+
+1. Login ke aplikasi sebagai **Admin** atau **Owner**
+2. Di sidebar kiri, klik **Pembelian**
+3. Klik **Rating Supplier**
+
+**Hak akses:** Hanya role **Owner** dan **Admin** yang dapat mengakses fitur ini.
+
+### 3.4 Halaman Ranking Supplier
+
+Halaman utama menampilkan ranking semua supplier berdasarkan skor keseluruhan:
+
+```
+┌──────────────────────────────────────────────────────────────────┐
+│  Rating Supplier                                                │
+│  Evaluasi performa supplier berdasarkan data transaksi          │
+│                                                                 │
+│  Dari: [2026-03-20]    Sampai: [2026-06-20]                    │
+│                                                                 │
+│  ┌──────────────────────────────────────────────────────────┐   │
+│  │ #  Supplier          Skor    Waktu  Lengkap Kualitas     │   │
+│  │                      Total                    Harga  PO  │   │
+│  ├──────────────────────────────────────────────────────────┤   │
+│  │ 1  PT Sumber Makmur  ████ 4.2  ████  ████   ████   ████ │↑  │
+│  │ 2  CV Bahan Segar    ███░ 3.8  ████  ███░   ████   ███░ │↓  │
+│  │ 3  UD Rempah Nusa    ███░ 3.5  ███░  ████   ███░   ███░ │─  │
+│  │ 4  Toko Bumbu Jaya   ██░░ 2.7  ██░░  ███░   ██░░   ██░░ │↓  │
+│  └──────────────────────────────────────────────────────────┘   │
+└──────────────────────────────────────────────────────────────────┘
+```
+
+**Kolom-kolom:**
+
+| Kolom | Penjelasan |
+|-------|-----------|
+| **#** | Peringkat (urutan berdasarkan skor tertinggi) |
+| **Supplier** | Nama supplier |
+| **Skor Total** | Skor keseluruhan (1-5) dengan progress bar berwarna |
+| **Waktu** | Skor Ketepatan Waktu (progress bar) |
+| **Lengkap** | Skor Kelengkapan Pesanan (progress bar) |
+| **Kualitas** | Skor Kualitas Barang (progress bar) |
+| **Harga** | Skor Harga Kompetitif (progress bar) |
+| **Total PO** | Jumlah Purchase Order dalam periode |
+| **Total Nilai** | Total nilai pembelian (Rp) |
+| **Trend** | Perubahan performa: ↑ naik (hijau), ↓ turun (merah), — stabil (abu) |
+
+**Interaksi:**
+- **Ubah periode** — Gunakan filter tanggal "Dari" dan "Sampai" untuk menganalisis periode tertentu. Default: 3 bulan terakhir.
+- **Klik baris supplier** → masuk ke halaman detail supplier
+
+### 3.5 Halaman Detail Supplier
+
+Klik supplier di ranking table untuk melihat detail lengkap:
+
+**A. Radar Chart**
+
+Visualisasi spider web / radar yang menampilkan skor 4 kriteria sekaligus. Semakin luas area yang terisi, semakin baik performa supplier.
+
+```
+         Ketepatan Waktu (4.5)
+              ╱╲
+             ╱  ╲
+            ╱ ╱╲ ╲
+  Harga    ╱╱    ╲╲   Kelengkapan
+  (3.8)   ╱╱      ╲╲   (4.0)
+           ╲╲      ╱╱
+            ╲╲  ╱╱
+             ╲╲╱╱
+              ╲╱
+         Kualitas (4.2)
+```
+
+**B. Score Breakdown Cards**
+
+4 kartu yang menampilkan skor per kriteria dengan progress bar visual:
+
+```
+┌──────────────┐ ┌──────────────┐ ┌──────────────┐ ┌──────────────┐
+│ Ketepatan    │ │ Kelengkapan  │ │ Kualitas     │ │ Harga        │
+│ Waktu        │ │ Pesanan      │ │ Barang       │ │ Kompetitif   │
+│    4.5 / 5   │ │    4.0 / 5   │ │    4.2 / 5   │ │    3.8 / 5   │
+│ ████████░░   │ │ ████████░░   │ │ ████████░░   │ │ ███████░░░   │
+└──────────────┘ └──────────────┘ └──────────────┘ └──────────────┘
+```
+
+**C. Riwayat Purchase Order**
+
+Tabel daftar PO dengan status ketepatan waktu:
+
+| PO Number | Tanggal PO | Status | Total (Rp) | Tepat Waktu? |
+|-----------|-----------|--------|------------|--------------|
+| PO-20260615-001 | 15 Jun 2026 | Completed | Rp 2.500.000 | ✅ Tepat Waktu |
+| PO-20260610-003 | 10 Jun 2026 | Completed | Rp 1.800.000 | ⚠️ Terlambat 2 Hari |
+| PO-20260605-002 | 5 Jun 2026 | Completed | Rp 3.200.000 | ✅ Tepat Waktu |
+
+**D. Item yang Disuplai**
+
+Tabel item yang dibeli dari supplier ini, beserta perbandingan harga:
+
+| Item | Harga Supplier | Harga Rata-rata Pasar | Status |
+|------|---------------|----------------------|--------|
+| Ayam Fillet | Rp 35.000/kg | Rp 37.000/kg | 🟢 Di bawah rata-rata |
+| Bawang Merah | Rp 28.000/kg | Rp 25.000/kg | 🔴 Di atas rata-rata |
+| Minyak Goreng | Rp 18.000/L | Rp 18.500/L | 🟢 Di bawah rata-rata |
+
+### 3.6 Mengambil Keputusan Berdasarkan Rating
+
+#### Supplier Skor ≥ 4.0 (Hijau) — Supplier Utama
+- Prioritaskan sebagai supplier utama untuk item kritis
+- Pertimbangkan kontrak jangka panjang untuk mengunci harga
+- Beri volume pesanan lebih besar
+
+#### Supplier Skor 3.0 – 3.9 (Kuning) — Supplier Pendukung
+- Gunakan sebagai alternatif/backup supplier
+- Identifikasi kriteria yang lemah dan komunikasikan ke supplier
+- Berikan kesempatan perbaikan 1-2 bulan, monitor trennya
+- Cocok untuk item non-kritis atau secondary source
+
+#### Supplier Skor < 3.0 (Merah) — Evaluasi Serius
+- Jadwalkan meeting dengan supplier untuk diskusi perbaikan
+- Cari supplier alternatif sebagai persiapan
+- Jika setelah 2 bulan tidak ada perbaikan → pertimbangkan ganti supplier
+- **Jangan langsung putus hubungan** — pastikan ada pengganti yang siap
+
+#### Trend Menurun (↓ Merah)
+- Meskipun skor masih hijau/kuning, trend turun perlu diwaspadai
+- Investigasi: apa yang berubah? Kualitas turun? Pengiriman mulai telat?
+- Komunikasikan concern lebih awal sebelum jadi masalah besar
+
+### 3.7 Tips & Best Practices
+
+1. **Review rating minimal 1x per kuartal** — Jadwalkan evaluasi supplier setiap 3 bulan
+2. **Gunakan periode 3 bulan** — Data 1 bulan terlalu fluktuatif, 3 bulan lebih representatif
+3. **Isi tanggal harapan (expectedDate) di setiap PO** — Jika tidak diisi, skor ketepatan waktu default ke 3 (netral), sehingga rating kurang akurat
+4. **Catat waste dengan benar** — Data waste memengaruhi skor kualitas supplier
+5. **Bandingkan trend, bukan hanya skor** — Supplier dengan skor 3.8 tapi trend naik mungkin lebih baik dari supplier skor 4.0 tapi trend turun
+6. **Gunakan data ini saat negosiasi** — "Data kami menunjukkan 30% pengiriman Anda terlambat" lebih kuat dari keluhan verbal
+7. **Jangan hanya mengandalkan skor** — Faktor lain seperti hubungan, fleksibilitas, dan lokasi juga penting
+
+### 3.8 FAQ Supplier Rating
+
+**Q: Kenapa skor supplier saya semua 3.0?**
+A: Kemungkinan besar karena data belum cukup. Jika tidak ada PO di periode yang dipilih, sistem memberikan skor default 3 (netral). Pastikan periode mencakup transaksi yang cukup.
+
+**Q: Kenapa skor Ketepatan Waktu default 3?**
+A: Jika PO tidak memiliki tanggal harapan pengiriman (expectedDate tidak diisi), sistem tidak bisa mengukur apakah pengiriman tepat waktu atau tidak, sehingga default ke 3.
+
+**Q: Kenapa skor Kualitas default 4?**
+A: Jika tidak ada data waste yang terkait item dari supplier tersebut, sistem mengasumsikan kualitas baik (skor 4). Skor akan menyesuaikan setelah ada data waste.
+
+**Q: Bagaimana cara meningkatkan akurasi rating?**
+A: Tiga hal utama: (1) Selalu isi expectedDate di PO, (2) Catat semua penerimaan barang (receiving) dengan jumlah aktual, (3) Catat waste dan kaitkan dengan batch/item dari supplier.
+
+**Q: Trend UP/DOWN/STABLE dihitung bagaimana?**
+A: Sistem membandingkan skor keseluruhan di periode yang Anda pilih vs periode sebelumnya yang sama panjangnya. Jika selisih > 0.3 poin → UP/DOWN, jika ≤ 0.3 → STABLE.
+
+**Q: Bisakah saya melihat rating untuk 1 supplier saja?**
+A: Ya, klik baris supplier di ranking table untuk masuk ke halaman detail dengan radar chart, riwayat PO, dan perbandingan harga per item.
+
+---
+
+## 4. Histori & Alert Harga Bahan
+
+### 4.1 Tentang Histori Harga
+
+Fitur Histori Harga melacak pergerakan harga setiap bahan baku dari waktu ke waktu. Setiap kali Anda menerima barang (receiving), harga dari PO tersebut otomatis tercatat dalam database histori.
+
+**Manfaat utama:**
+- Melihat trend harga bahan (naik/turun/stabil) dalam grafik
+- Mendapat **alert otomatis** ketika harga naik lebih dari 10%
+- Membandingkan harga dari supplier berbeda untuk item yang sama
+- Data untuk negosiasi harga dengan supplier
+- Mendeteksi kenaikan harga abnormal sebelum berdampak besar ke food cost
+
+### 4.2 Cara Data Harga Terkumpul
+
+Data harga **otomatis tercatat** setiap kali Anda melakukan penerimaan barang (receiving). Anda **tidak perlu input manual**.
+
+```
+Alur otomatis:
+                                                  ┌──────────────┐
+Buat PO → Terima Barang (Receiving) → Sistem ──→  │ PriceHistory │
+   │            │                       catat     │   Database   │
+   │            │                       harga     └──────┬───────┘
+   │            │                                        │
+   │            │                                        ▼
+   │            │                              Cek: harga naik >10%?
+   │            │                                   │         │
+   │            │                                  Ya        Tidak
+   │            │                                   │         │
+   │            │                                   ▼         ▼
+   │            │                             Kirim Alert   (selesai)
+   │            │                             ke Purchaser
+   │            │                             & Owner
+```
+
+**Yang dicatat per receiving:**
+- Item apa
+- Dari supplier mana
+- Harga berapa per satuan
+- Jumlah yang diterima
+- Tanggal terima
+- Referensi PO
+
+### 4.3 Halaman Histori & Alert Harga
+
+**Cara mengakses:**
+1. Login ke aplikasi
+2. Di sidebar kiri, klik **Stok Gudang**
+3. Klik **Histori Harga**
+
+**Hak akses:** Role **Owner**, **Admin**, dan **Purchaser**.
+
+**A. Summary Cards**
+
+4 kartu ringkasan di bagian atas:
+
+```
+┌──────────────────┐ ┌──────────────────┐ ┌──────────────────┐ ┌──────────────────┐
+│ 📦 Total Item    │ │ 📈 Harga Naik    │ │ 📉 Harga Turun   │ │ 📊 Rata-rata     │
+│    Terlacak      │ │    >10%          │ │    >10%          │ │    Perubahan     │
+│       45         │ │       3          │ │       2          │ │     +2.5%        │
+└──────────────────┘ └──────────────────┘ └──────────────────┘ └──────────────────┘
+```
+
+| Card | Penjelasan |
+|------|-----------|
+| **Total Item Terlacak** | Jumlah item unik yang sudah punya data histori harga |
+| **Harga Naik >10%** | Jumlah item yang harganya naik lebih dari 10% dari rata-rata 30 hari (merah, perlu perhatian) |
+| **Harga Turun >10%** | Jumlah item yang harganya turun lebih dari 10% (hijau, kabar baik) |
+| **Rata-rata Perubahan** | Rata-rata persentase perubahan harga seluruh item |
+
+**B. Tabel Alert Harga**
+
+Di bawah summary cards, terdapat tabel item dengan perubahan harga signifikan:
+
+```
+┌──────────────────────────────────────────────────────────────────┐
+│  Item            Harga Saat Ini  Rata-rata 30h  Perubahan  Aksi │
+├──────────────────────────────────────────────────────────────────┤
+│  Ayam Fillet     Rp 38.000      Rp 33.000      ↑ +15.2%   [→]  │  ← Merah
+│  Bawang Putih    Rp 42.000      Rp 37.500      ↑ +12.0%   [→]  │  ← Merah
+│  Minyak Goreng   Rp 16.000      Rp 18.000      ↓ -11.1%   [→]  │  ← Hijau
+└──────────────────────────────────────────────────────────────────┘
+```
+
+| Kolom | Penjelasan |
+|-------|-----------|
+| **Item** | Nama bahan baku |
+| **Harga Saat Ini** | Harga beli terakhir (dari receiving terakhir) |
+| **Rata-rata 30 Hari** | Rata-rata harga beli dalam 30 hari terakhir |
+| **Perubahan** | Persentase perubahan: merah + ↑ untuk kenaikan, hijau + ↓ untuk penurunan |
+| **Aksi** | Klik untuk masuk ke halaman detail harga item |
+
+**Interaksi:**
+- **Pagination** — Jika item banyak, gunakan tombol halaman di bawah tabel
+- **Klik baris / tombol aksi** → masuk ke halaman detail harga item
+
+### 4.4 Halaman Detail Harga Item
+
+Klik item dari tabel alert untuk melihat detail lengkap pergerakan harga:
+
+**A. Statistik Harga (5 Cards)**
+
+```
+┌─────────────┐ ┌─────────────┐ ┌─────────────┐ ┌─────────────┐ ┌─────────────┐
+│ Harga       │ │ Rata-rata   │ │ Harga       │ │ Harga       │ │ Perubahan   │
+│ Saat Ini    │ │ 30 Hari     │ │ Terendah    │ │ Tertinggi   │ │ 30 Hari     │
+│ Rp 38.000   │ │ Rp 33.000   │ │ Rp 30.000   │ │ Rp 40.000   │ │  +15.2%     │
+└─────────────┘ └─────────────┘ └─────────────┘ └─────────────┘ └─────────────┘
+```
+
+| Card | Penjelasan |
+|------|-----------|
+| **Harga Saat Ini** | Harga beli terakhir dari receiving paling baru |
+| **Rata-rata 30 Hari** | Rata-rata harga dalam 30 hari terakhir |
+| **Harga Terendah** | Harga paling murah yang pernah tercatat (dalam periode yang ditampilkan) |
+| **Harga Tertinggi** | Harga paling mahal yang pernah tercatat |
+| **Perubahan 30 Hari** | Persentase kenaikan/penurunan harga saat ini vs rata-rata 30 hari. Merah jika naik, hijau jika turun. |
+
+**B. Grafik Trend Harga (Line Chart)**
+
+Grafik garis menampilkan pergerakan harga selama 6 bulan terakhir:
+
+```
+  Harga (Rp)
+  40.000 ┤                                          ●
+  38.000 ┤                                     ●  ╱
+  36.000 ┤                               ●   ╱  ╱
+  34.000 ┤              ●───●       ●───●╱  ╱
+  32.000 ┤         ●──╱                   ╱
+  30.000 ┤    ●──●╱                      ╱  ← Supplier A (biru)
+  28.000 ┤                          ●──●    ← Supplier B (hijau)
+         └─────────────────────────────────→
+          Jan   Feb   Mar   Apr   Mei  Jun
+```
+
+**Fitur grafik:**
+- **Garis berbeda warna** untuk setiap supplier (jika item dibeli dari lebih dari 1 supplier)
+- **Hover pada titik** → tooltip menampilkan tanggal, harga, nama supplier
+- **Legend** di bawah grafik menunjukkan supplier mana yang diwakili garis mana
+- Default menampilkan 6 bulan terakhir
+
+**C. Tabel Perbandingan Supplier**
+
+Perbandingan harga antar supplier untuk item yang sama:
+
+```
+┌────────────────────────────────────────────────────────────────┐
+│  Supplier          Harga      Rata-rata  Terendah  Tertinggi  │
+│                    Terakhir                                    │
+├────────────────────────────────────────────────────────────────┤
+│  PT Sumber Makmur  Rp 35.000  Rp 33.500  Rp 30.000 Rp 37.000 │ ← Hijau (termurah)
+│  CV Bahan Segar    Rp 38.000  Rp 36.000  Rp 33.000 Rp 40.000 │
+│  UD Rempah Nusa    Rp 39.000  Rp 37.500  Rp 35.000 Rp 42.000 │
+└────────────────────────────────────────────────────────────────┘
+```
+
+- Supplier dengan harga terakhir **paling murah** di-highlight **hijau**
+- Tabel diurutkan dari harga termurah ke termahal
+- Gunakan data ini untuk memutuskan dari supplier mana sebaiknya membeli
+
+### 4.5 Alert Harga Otomatis
+
+Sistem secara otomatis mengirim notifikasi ketika mendeteksi kenaikan harga abnormal:
+
+**Kapan alert dikirim?**
+Setiap kali barang diterima (receiving), sistem otomatis:
+1. Mencatat harga ke database histori
+2. Menghitung rata-rata harga 30 hari terakhir untuk item tersebut
+3. Jika harga saat ini **lebih dari 10% di atas rata-rata** → kirim notifikasi
+
+**Contoh:**
+- Rata-rata harga Ayam Fillet 30 hari terakhir: Rp 33.000/kg
+- Harga pada receiving hari ini: Rp 38.000/kg
+- Kenaikan: (38.000 - 33.000) / 33.000 × 100% = **+15.2%**
+- Karena > 10% → **Alert dikirim!**
+
+**Siapa yang menerima alert?**
+
+| Role | Menerima Alert? |
+|------|----------------|
+| Purchaser | ✅ Ya |
+| Owner | ✅ Ya |
+| Admin | ❌ Tidak |
+| Kitchen Manager | ❌ Tidak |
+
+**Di mana alert muncul?**
+- Notification Bell (🔔) di header — dengan ikon 📈 (TrendingUp) berwarna merah
+- Halaman Notifikasi (/notifikasi)
+
+**Contoh notifikasi:**
+```
+📈 Kenaikan Harga: Ayam Fillet
+Harga Ayam Fillet naik 15.2% dari rata-rata 30 hari
+(Rp 38.000 vs rata-rata Rp 33.000). Supplier: PT Sumber Makmur
+```
+
+### 4.6 Strategi Berdasarkan Data Harga
+
+#### Kenaikan Harga > 10%
+1. **Cek apakah kenaikan terjadi di semua supplier** — Buka detail item, lihat tabel perbandingan
+   - Jika semua supplier naik → kemungkinan harga pasar memang naik
+   - Jika hanya 1 supplier → coba beralih ke supplier yang lebih murah
+2. **Evaluasi dampak ke food cost** — Cek di Menu Engineering, apakah menu yang menggunakan bahan ini masih profitable
+3. **Negosiasi dengan supplier** — Gunakan data histori sebagai bahan: "Harga Anda naik 15% dalam sebulan terakhir, supplier lain masih di harga Rp 35.000"
+4. **Pertimbangkan substitusi bahan** — Jika kenaikan permanen, cari bahan pengganti yang lebih murah
+
+#### Menemukan Supplier Termurah
+1. Buka halaman detail item
+2. Lihat tabel Perbandingan Supplier
+3. Supplier yang di-highlight hijau = harga termurah saat ini
+4. Pertimbangkan juga skor Supplier Rating — harga murah tapi sering telat/jumlah kurang bisa lebih mahal secara total
+
+#### Trend Harga Musiman
+1. Gunakan grafik trend 6 bulan untuk mengidentifikasi pola
+2. Contoh: harga cabai biasanya naik saat musim hujan
+3. Strategi: **beli lebih banyak** sebelum periode kenaikan harga yang sudah diprediksi
+4. Setelah beberapa bulan data terkumpul, pola ini akan lebih jelas terlihat
+
+### 4.7 FAQ Histori Harga
+
+**Q: Apakah saya harus input data harga secara manual?**
+A: Tidak. Data harga **otomatis tercatat** setiap kali Anda melakukan penerimaan barang (receiving). Harga diambil dari PO item yang terkait.
+
+**Q: Kenapa halaman histori harga masih kosong?**
+A: Data histori harga mulai terisi setelah ada proses receiving yang tercatat di sistem. Jika Anda baru mulai menggunakan aplikasi, data akan terkumpul seiring waktu.
+
+**Q: Alert hanya muncul untuk kenaikan harga, bagaimana dengan penurunan?**
+A: Saat ini alert otomatis hanya dikirim untuk **kenaikan** > 10%. Penurunan harga tetap terlihat di tabel alert (warna hijau) tapi tidak memicu notifikasi push, karena penurunan harga biasanya kabar baik yang tidak memerlukan aksi urgent.
+
+**Q: Harga rata-rata 30 hari dihitung dari data apa?**
+A: Dari semua data PriceHistory (semua receiving) untuk item tersebut dalam 30 hari terakhir, tanpa memandang supplier. Ini memberikan gambaran "harga pasar" yang komprehensif.
+
+**Q: Bisakah saya melihat histori harga lebih dari 6 bulan?**
+A: Default grafik menampilkan 6 bulan. Data histori tersimpan permanen di database — fitur untuk menyesuaikan rentang waktu grafik akan tersedia di update berikutnya.
+
+**Q: Bagaimana hubungan fitur ini dengan Supplier Rating?**
+A: Kedua fitur saling melengkapi:
+- **Histori Harga** → fokus pada trend harga per item
+- **Supplier Rating** → skor kompetitif harga adalah salah satu dari 4 kriteria penilaian supplier
+- Data dari PriceHistory digunakan oleh Supplier Rating untuk menghitung skor "Harga Kompetitif"
+
+**Q: Apa yang terjadi jika supplier menaikkan harga tapi saya sudah terlanjur approve PO?**
+A: Alert muncul saat **receiving** (terima barang), bukan saat buat PO. Jadi Anda bisa mengetahui kenaikan harga sebelum receiving berikutnya dan negosiasi ulang.
+
+---
+
 ## Glosarium
 
 | Istilah | Penjelasan |
@@ -429,6 +897,11 @@ A: Tidak ada limit. Namun, notifikasi ditampilkan dengan pagination (20 per hala
 | **Minimum Stok** | Batas stok terendah yang diset untuk setiap item. Jika stok di bawah angka ini, sistem akan mengirim alert |
 | **Badge** | Lingkaran kecil berisi angka yang muncul pada ikon, menunjukkan jumlah item yang perlu perhatian |
 | **Popover** | Panel kecil yang muncul saat mengklik sebuah tombol, tanpa membuka halaman baru |
+| **Supplier Rating** | Skor performa supplier (1-5) yang dihitung otomatis berdasarkan 4 kriteria: ketepatan waktu, kelengkapan, kualitas, dan harga |
+| **Radar Chart** | Grafik spider web/jaring laba-laba yang menampilkan beberapa metrik sekaligus dalam satu visualisasi |
+| **Trend** | Arah perubahan performa (naik/turun/stabil) dibandingkan periode sebelumnya |
+| **Price History** | Catatan historis harga beli setiap item dari setiap receiving, digunakan untuk analisis trend |
+| **Harga Pasar** | Rata-rata harga item dari semua supplier, digunakan sebagai pembanding harga individual supplier |
 
 ---
 
