@@ -6,8 +6,8 @@ import { useState } from 'react';
 import {
   LayoutDashboard, Truck, FileText, PackageCheck, Receipt,
   Package, ArrowLeftRight, ClipboardCheck, ChefHat, CalendarDays,
-  Trash2, Calculator, BarChart3, TrendingUp, Users, Tag, Ruler,
-  ChevronDown, ChevronRight, Menu, Bell,
+  Trash2, Calculator, BarChart3, TrendingUp, TrendingDown, Users, Tag, Ruler,
+  ChevronDown, ChevronRight, Menu, Bell, Award,
 } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { useAuthStore } from '@/stores/auth-store';
@@ -46,6 +46,7 @@ const navGroups: NavGroup[] = [
       { title: 'Purchase Order', href: '/pembelian/purchase-order', icon: FileText },
       { title: 'Penerimaan', href: '/pembelian/receiving', icon: PackageCheck },
       { title: 'Bukti Pembelian', href: '/pembelian/invoice', icon: Receipt },
+      { title: 'Rating Supplier', href: '/pembelian/supplier-rating', icon: Award },
     ],
   },
   {
@@ -54,6 +55,7 @@ const navGroups: NavGroup[] = [
       { title: 'Master Item', href: '/stok/item', icon: Package },
       { title: 'Mutasi Stok', href: '/stok/mutasi', icon: ArrowLeftRight },
       { title: 'Stok Opname', href: '/stok/opname', icon: ClipboardCheck },
+      { title: 'Histori Harga', href: '/stok/histori-harga', icon: TrendingDown },
     ],
   },
   {

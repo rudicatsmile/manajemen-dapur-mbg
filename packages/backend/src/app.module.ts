@@ -18,6 +18,8 @@ import { ReportModule } from './modules/report/report.module';
 import { CategoryModule } from './modules/category/category.module';
 import { UnitModule } from './modules/unit/unit.module';
 import { NotificationModule } from './modules/notification/notification.module';
+import { SupplierRatingModule } from './modules/supplier-rating/supplier-rating.module';
+import { PriceHistoryModule } from './modules/price-history/price-history.module';
 
 @Module({
   imports: [
@@ -40,6 +42,8 @@ import { NotificationModule } from './modules/notification/notification.module';
     CategoryModule,
     UnitModule,
     NotificationModule,
+    SupplierRatingModule,
+    PriceHistoryModule,
   ],
 })
 export class AppModule {}

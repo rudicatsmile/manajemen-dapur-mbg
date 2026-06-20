@@ -106,6 +106,7 @@ model Supplier {
 
   purchaseOrders  PurchaseOrder[]
   purchaseInvoices PurchaseInvoice[]
+  priceHistory    PriceHistory[]
 
   @@map("suppliers")
 }
@@ -137,6 +138,7 @@ model Item {
   recipeItems        RecipeItem[]
   productionItems    ProductionItem[]
   wasteRecords       WasteRecord[]
+  priceHistory       PriceHistory[]
 
   @@index([categoryId])
   @@index([sku])
@@ -443,4 +445,22 @@ model Notification {
   @@index([userId, isRead])
   @@index([createdAt])
   @@map("notifications")
+}
+
+model PriceHistory {
+  id          Int      @id @default(autoincrement())
+  itemId      Int      @map("item_id")
+  supplierId  Int      @map("supplier_id")
+  price       Decimal  @db.Decimal(15, 2)
+  quantity    Decimal  @db.Decimal(15, 3)
+  poId        Int      @map("po_id")
+  recordedAt  DateTime @map("recorded_at") @db.Date
+
+  item     Item     @relation(fields: [itemId], references: [id])
+  supplier Supplier @relation(fields: [supplierId], references: [id])
+
+  @@index([itemId])
+  @@index([supplierId])
+  @@index([recordedAt])
+  @@map("price_history")
 }

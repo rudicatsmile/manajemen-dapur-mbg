@@ -1,12 +1,16 @@
 import { Injectable, NotFoundException, BadRequestException } from '@nestjs/common';
 import { PrismaService } from '../../prisma/prisma.service';
+import { PriceHistoryService } from '../price-history/price-history.service';
 import { paginate, paginationMeta } from '../../common/helpers/pagination.helper';
 import { generateDocNumber } from '../../common/helpers/doc-number.helper';
 import { Decimal } from '@prisma/client/runtime/library';
 
 @Injectable()
 export class ReceivingService {
-  constructor(private prisma: PrismaService) {}
+  constructor(
+    private prisma: PrismaService,
+    private priceHistoryService: PriceHistoryService,
+  ) {}
 
   async findAll(page: number, perPage: number, search?: string) {
     const { skip, take } = paginate(page, perPage);
@@ -59,7 +63,7 @@ export class ReceivingService {
       throw new BadRequestException('PO belum disetujui atau sudah selesai');
     }
 
-    return this.prisma.$transaction(async (tx) => {
+    const result = await this.prisma.$transaction(async (tx) => {
       const receivingNumber = await generateDocNumber(tx as any, 'RCV', 'receivings', 'receiving_number');
 
       const receiving = await tx.receiving.create({
@@ -139,7 +143,34 @@ export class ReceivingService {
         data: { status: allReceived ? 'COMPLETED' : 'PARTIALLY_RECEIVED' },
       });
 
-      return receiving;
+      // Record price history for each received item after transaction
+      const priceRecords = data.items.map((rcvItem: any) => {
+        const poItem = po.items.find((pi) => pi.id === rcvItem.poItemId);
+        return {
+          itemId: rcvItem.itemId,
+          supplierId: po.supplierId,
+          price: poItem!.unitPrice,
+          quantity: rcvItem.quantity,
+          poId: data.poId,
+          date: new Date(data.receivedDate),
+        };
+      });
+
+      return { receiving, priceRecords };
     });
+
+    // Record price history outside transaction to avoid long-running tx
+    for (const pr of result.priceRecords) {
+      await this.priceHistoryService.recordPrice(
+        pr.itemId,
+        pr.supplierId,
+        pr.price,
+        pr.quantity,
+        pr.poId,
+        pr.date,
+      );
+    }
+
+    return result.receiving;
   }
 }

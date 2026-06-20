@@ -2,7 +2,7 @@
 
 import { useState } from 'react';
 import { useRouter } from 'next/navigation';
-import { Bell, PackageX, Clock, AlertTriangle, Info, Check } from 'lucide-react';
+import { Bell, PackageX, Clock, AlertTriangle, Info, Check, TrendingUp } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
 import { Separator } from '@/components/ui/separator';
@@ -43,6 +43,8 @@ function getNotificationIcon(type: string) {
       return <Clock className="h-4 w-4 text-yellow-500" />;
     case 'PO_OVERDUE':
       return <AlertTriangle className="h-4 w-4 text-orange-500" />;
+    case 'PRICE_ALERT':
+      return <TrendingUp className="h-4 w-4 text-red-500" />;
     default:
       return <Info className="h-4 w-4 text-blue-500" />;
   }
