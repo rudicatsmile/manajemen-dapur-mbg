@@ -1,4 +1,4 @@
-import { Controller, Get, UseGuards } from '@nestjs/common';
+import { Controller, Get, Query, UseGuards } from '@nestjs/common';
 import { DashboardService } from './dashboard.service';
 import { JwtAuthGuard } from '../../common/guards/jwt-auth.guard';
 import { RolesGuard } from '../../common/guards/roles.guard';
@@ -26,5 +26,13 @@ export class DashboardController {
   @Get('food-cost')
   async foodCost() {
     return this.dashboardService.foodCost();
+  }
+
+  @Get('menu-engineering')
+  async menuEngineering(
+    @Query('from') from: string,
+    @Query('to') to: string,
+  ) {
+    return this.dashboardService.getMenuEngineering(from, to);
   }
 }

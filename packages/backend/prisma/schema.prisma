@@ -42,6 +42,7 @@ model User {
   wastesCreated          WasteRecord[]
   stockMovements         StockMovement[]
   auditLogs              AuditLog[]
+  notifications          Notification[]
 
   @@map("users")
 }
@@ -424,4 +425,22 @@ model AuditLog {
   @@index([userId])
   @@index([createdAt])
   @@map("audit_logs")
+}
+
+model Notification {
+  id          Int      @id @default(autoincrement())
+  userId      Int      @map("user_id")
+  type        String   @db.VarChar(50)
+  title       String   @db.VarChar(200)
+  message     String   @db.Text
+  isRead      Boolean  @default(false) @map("is_read")
+  link        String?  @db.VarChar(500)
+  metadata    Json?
+  createdAt   DateTime @default(now()) @map("created_at")
+
+  user User @relation(fields: [userId], references: [id])
+
+  @@index([userId, isRead])
+  @@index([createdAt])
+  @@map("notifications")
 }

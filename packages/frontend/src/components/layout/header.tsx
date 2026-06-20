@@ -10,6 +10,7 @@ import {
   DropdownMenuSeparator, DropdownMenuTrigger,
 } from '@/components/ui/dropdown-menu';
 import { Button } from '@/components/ui/button';
+import { NotificationBell } from './notification-bell';
 
 export function Header() {
   const router = useRouter();
@@ -28,6 +29,7 @@ export function Header() {
     <header className="sticky top-0 z-40 flex h-14 items-center gap-4 border-b bg-background px-4 lg:px-6">
       <MobileSidebar />
       <div className="flex-1" />
+      <NotificationBell />
       <DropdownMenu>
         <DropdownMenuTrigger asChild>
           <Button variant="ghost" className="relative h-9 w-9 rounded-full">

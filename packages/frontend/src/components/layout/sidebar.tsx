@@ -6,8 +6,8 @@ import { useState } from 'react';
 import {
   LayoutDashboard, Truck, FileText, PackageCheck, Receipt,
   Package, ArrowLeftRight, ClipboardCheck, ChefHat, CalendarDays,
-  Trash2, Calculator, BarChart3, Users, Tag, Ruler,
-  ChevronDown, ChevronRight, Menu,
+  Trash2, Calculator, BarChart3, TrendingUp, Users, Tag, Ruler,
+  ChevronDown, ChevronRight, Menu, Bell,
 } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { useAuthStore } from '@/stores/auth-store';
@@ -16,6 +16,7 @@ import { Button } from '@/components/ui/button';
 import { Sheet, SheetContent, SheetTrigger, SheetTitle } from '@/components/ui/sheet';
 import { Separator } from '@/components/ui/separator';
 import { useLowStockCount } from '@/hooks/queries/use-dashboard';
+import { useNotificationCount } from '@/hooks/queries/use-notifications';
 
 interface NavItem {
   title: string;
@@ -33,7 +34,10 @@ interface NavGroup {
 const navGroups: NavGroup[] = [
   {
     title: '',
-    items: [{ title: 'Dashboard', href: '/dashboard', icon: LayoutDashboard }],
+    items: [
+      { title: 'Dashboard', href: '/dashboard', icon: LayoutDashboard },
+      { title: 'Notifikasi', href: '/notifikasi', icon: Bell },
+    ],
   },
   {
     title: 'Pembelian',
@@ -64,6 +68,7 @@ const navGroups: NavGroup[] = [
     title: 'Laporan',
     items: [
       { title: 'Biaya Per Porsi', href: '/laporan/biaya-per-porsi', icon: Calculator },
+      { title: 'Menu Engineering', href: '/laporan/menu-engineering', icon: TrendingUp },
       { title: 'Laporan', href: '/laporan', icon: BarChart3 },
     ],
   },
@@ -82,6 +87,7 @@ function SidebarNav({ onNavigate }: { onNavigate?: () => void }) {
   const pathname = usePathname();
   const user = useAuthStore((s) => s.user);
   const { data: lowStockCount } = useLowStockCount();
+  const { data: notifCount } = useNotificationCount();
   const [collapsed, setCollapsed] = useState<Record<string, boolean>>({});
 
   const toggle = (title: string) => setCollapsed((prev) => ({ ...prev, [title]: !prev[title] }));
@@ -111,7 +117,7 @@ function SidebarNav({ onNavigate }: { onNavigate?: () => void }) {
               {!collapsed[group.title] &&
                 group.items.map((item) => {
                   const isActive = pathname === item.href || pathname.startsWith(item.href + '/');
-                  const badgeCount = item.href === '/stok/item' ? lowStockCount : undefined;
+                  const badgeCount = item.href === '/stok/item' ? lowStockCount : item.href === '/notifikasi' ? notifCount : undefined;
                   return (
                     <Link
                       key={item.href}

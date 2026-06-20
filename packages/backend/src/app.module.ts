@@ -17,6 +17,7 @@ import { AuditLogModule } from './modules/audit-log/audit-log.module';
 import { ReportModule } from './modules/report/report.module';
 import { CategoryModule } from './modules/category/category.module';
 import { UnitModule } from './modules/unit/unit.module';
+import { NotificationModule } from './modules/notification/notification.module';
 
 @Module({
   imports: [
@@ -38,6 +39,7 @@ import { UnitModule } from './modules/unit/unit.module';
     ReportModule,
     CategoryModule,
     UnitModule,
+    NotificationModule,
   ],
 })
 export class AppModule {}

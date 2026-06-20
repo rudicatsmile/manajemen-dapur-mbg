@@ -76,6 +76,136 @@ export class DashboardService {
     return data;
   }
 
+  async getMenuEngineering(from: string, to: string) {
+    const fromDate = new Date(from);
+    const toDate = new Date(to);
+    toDate.setDate(toDate.getDate() + 1); // inclusive end date
+
+    // 1. Get all active recipes with their ingredients
+    const recipes = await this.prisma.recipe.findMany({
+      where: { isActive: true },
+      include: {
+        items: {
+          include: {
+            item: { select: { lastPrice: true } },
+          },
+        },
+        category: { select: { name: true } },
+      },
+    });
+
+    // 2. Get production volumes per recipe for the date range
+    const productions = await this.prisma.production.groupBy({
+      by: ['recipeId'],
+      _sum: { plannedQty: true },
+      where: {
+        status: 'COMPLETED',
+        productionDate: { gte: fromDate, lt: toDate },
+      },
+    });
+
+    const productionMap = new Map(
+      productions.map((p) => [p.recipeId, Number(p._sum.plannedQty || 0)]),
+    );
+
+    // 3. Build menu items with cost and production data
+    const menuItems = recipes.map((recipe) => {
+      const yieldQty = Number(recipe.yieldQuantity);
+      const costPerServing =
+        yieldQty > 0
+          ? recipe.items.reduce((sum, ri) => {
+              const ingredientCost =
+                (Number(ri.quantity) / yieldQty) * Number(ri.item.lastPrice);
+              return sum + ingredientCost;
+            }, 0)
+          : 0;
+
+      const sellingPrice = Number(recipe.sellingPrice);
+      const profitPerServing = sellingPrice - costPerServing;
+      const foodCostPercentage =
+        sellingPrice > 0 ? (costPerServing / sellingPrice) * 100 : 0;
+      const totalProduced = productionMap.get(recipe.id) || 0;
+
+      return {
+        recipeId: recipe.id,
+        recipeName: recipe.name,
+        category: recipe.category.name,
+        sellingPrice,
+        costPerServing: Math.round(costPerServing * 100) / 100,
+        foodCostPercentage: Math.round(foodCostPercentage * 100) / 100,
+        profitPerServing: Math.round(profitPerServing * 100) / 100,
+        totalProduced,
+        classification: '' as 'STAR' | 'PUZZLE' | 'PLOW_HORSE' | 'DOG',
+      };
+    });
+
+    // 4. Calculate medians
+    const sortedPopularity = [...menuItems]
+      .map((m) => m.totalProduced)
+      .sort((a, b) => a - b);
+    const sortedProfit = [...menuItems]
+      .map((m) => m.profitPerServing)
+      .sort((a, b) => a - b);
+
+    const median = (arr: number[]) => {
+      if (arr.length === 0) return 0;
+      const mid = Math.floor(arr.length / 2);
+      return arr.length % 2 !== 0
+        ? arr[mid]
+        : (arr[mid - 1] + arr[mid]) / 2;
+    };
+
+    const medianPopularity = median(sortedPopularity);
+    const medianProfit = median(sortedProfit);
+
+    // 5. Classify each menu item
+    for (const item of menuItems) {
+      if (
+        item.totalProduced >= medianPopularity &&
+        item.profitPerServing >= medianProfit
+      ) {
+        item.classification = 'STAR';
+      } else if (
+        item.totalProduced < medianPopularity &&
+        item.profitPerServing >= medianProfit
+      ) {
+        item.classification = 'PUZZLE';
+      } else if (
+        item.totalProduced >= medianPopularity &&
+        item.profitPerServing < medianProfit
+      ) {
+        item.classification = 'PLOW_HORSE';
+      } else {
+        item.classification = 'DOG';
+      }
+    }
+
+    // 6. Build summary
+    const summary = {
+      starCount: menuItems.filter((m) => m.classification === 'STAR').length,
+      puzzleCount: menuItems.filter((m) => m.classification === 'PUZZLE').length,
+      plowHorseCount: menuItems.filter((m) => m.classification === 'PLOW_HORSE').length,
+      dogCount: menuItems.filter((m) => m.classification === 'DOG').length,
+      totalMenus: menuItems.length,
+      averageFoodCost:
+        menuItems.length > 0
+          ? Math.round(
+              (menuItems.reduce((s, m) => s + m.foodCostPercentage, 0) /
+                menuItems.length) *
+                100,
+            ) / 100
+          : 0,
+    };
+
+    return {
+      data: {
+        items: menuItems,
+        thresholds: { medianPopularity, medianProfit },
+        summary,
+      },
+    };
+  }
+
   async foodCost() {
     const recipes = await this.prisma.recipe.findMany({
       where: { isActive: true },
