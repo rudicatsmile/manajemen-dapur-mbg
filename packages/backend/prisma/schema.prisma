@@ -71,7 +71,6 @@ model UnitOfMeasure {
   recipeItems       RecipeItem[]
   productionItems   ProductionItem[]
   wasteRecords      WasteRecord[]
-  stockMovementsUnit StockMovement[]
   conversionsFrom   UnitConversion[]    @relation("FromUnit")
   conversionsTo     UnitConversion[]    @relation("ToUnit")
 
