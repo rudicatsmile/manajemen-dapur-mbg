@@ -1,0 +1,428 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "mysql"
+  url      = env("DATABASE_URL")
+}
+
+enum Role {
+  OWNER
+  ADMIN
+  PURCHASER
+  KITCHEN_MANAGER
+}
+
+enum CategoryType {
+  ITEM
+  RECIPE
+}
+
+model User {
+  id           Int       @id @default(autoincrement())
+  email        String    @unique @db.VarChar(255)
+  passwordHash String    @map("password_hash") @db.VarChar(255)
+  name         String    @db.VarChar(100)
+  role         Role      @default(ADMIN)
+  isActive     Boolean   @default(true) @map("is_active")
+  lastLoginAt  DateTime? @map("last_login_at")
+  createdAt    DateTime  @default(now()) @map("created_at")
+  updatedAt    DateTime  @updatedAt @map("updated_at")
+
+  purchaseOrdersCreated  PurchaseOrder[]  @relation("CreatedByUser")
+  purchaseOrdersApproved PurchaseOrder[]  @relation("ApprovedByUser")
+  receivingsCreated      Receiving[]
+  invoicesCreated        PurchaseInvoice[] @relation("InvoiceCreatedBy")
+  invoicesVerified       PurchaseInvoice[] @relation("InvoiceVerifiedBy")
+  stockOpnamesCreated    StockOpname[]     @relation("OpnameCreatedBy")
+  stockOpnamesApproved   StockOpname[]     @relation("OpnameApprovedBy")
+  recipesCreated         Recipe[]
+  productionsCreated     Production[]
+  wastesCreated          WasteRecord[]
+  stockMovements         StockMovement[]
+  auditLogs              AuditLog[]
+
+  @@map("users")
+}
+
+model Category {
+  id          Int          @id @default(autoincrement())
+  name        String       @db.VarChar(100)
+  type        CategoryType
+  description String?      @db.Text
+  isActive    Boolean      @default(true) @map("is_active")
+
+  items   Item[]
+  recipes Recipe[]
+
+  @@map("categories")
+}
+
+model UnitOfMeasure {
+  id           Int    @id @default(autoincrement())
+  name         String @db.VarChar(50)
+  abbreviation String @db.VarChar(10)
+
+  itemsBase         Item[]              @relation("BaseUnit")
+  itemsPurchase     Item[]              @relation("PurchaseUnit")
+  purchaseOrderItems PurchaseOrderItem[]
+  receivingItems    ReceivingItem[]
+  recipeItems       RecipeItem[]
+  productionItems   ProductionItem[]
+  wasteRecords      WasteRecord[]
+  stockMovementsUnit StockMovement[]
+  conversionsFrom   UnitConversion[]    @relation("FromUnit")
+  conversionsTo     UnitConversion[]    @relation("ToUnit")
+
+  @@map("units_of_measure")
+}
+
+model UnitConversion {
+  id         Int                @id @default(autoincrement())
+  fromUnitId Int                @map("from_unit_id")
+  toUnitId   Int                @map("to_unit_id")
+  factor     Decimal            @db.Decimal(15, 6)
+
+  fromUnit UnitOfMeasure @relation("FromUnit", fields: [fromUnitId], references: [id])
+  toUnit   UnitOfMeasure @relation("ToUnit", fields: [toUnitId], references: [id])
+
+  @@unique([fromUnitId, toUnitId])
+  @@map("unit_conversions")
+}
+
+model Supplier {
+  id            Int      @id @default(autoincrement())
+  name          String   @db.VarChar(200)
+  address       String?  @db.Text
+  phone         String?  @db.VarChar(20)
+  email         String?  @db.VarChar(255)
+  contactPerson String?  @map("contact_person") @db.VarChar(100)
+  category      String?  @db.VarChar(100)
+  notes         String?  @db.Text
+  isActive      Boolean  @default(true) @map("is_active")
+  createdAt     DateTime @default(now()) @map("created_at")
+  updatedAt     DateTime @updatedAt @map("updated_at")
+
+  purchaseOrders  PurchaseOrder[]
+  purchaseInvoices PurchaseInvoice[]
+
+  @@map("suppliers")
+}
+
+model Item {
+  id               Int      @id @default(autoincrement())
+  sku              String   @unique @db.VarChar(50)
+  name             String   @db.VarChar(200)
+  categoryId       Int      @map("category_id")
+  baseUnitId       Int      @map("base_unit_id")
+  purchaseUnitId   Int?     @map("purchase_unit_id")
+  conversionFactor Decimal  @default(1) @map("conversion_factor") @db.Decimal(15, 6)
+  minStock         Decimal  @default(0) @map("min_stock") @db.Decimal(15, 3)
+  currentStock     Decimal  @default(0) @map("current_stock") @db.Decimal(15, 3)
+  lastPrice        Decimal  @default(0) @map("last_price") @db.Decimal(15, 2)
+  imageUrl         String?  @map("image_url") @db.VarChar(500)
+  isActive         Boolean  @default(true) @map("is_active")
+  createdAt        DateTime @default(now()) @map("created_at")
+  updatedAt        DateTime @updatedAt @map("updated_at")
+
+  category     Category      @relation(fields: [categoryId], references: [id])
+  baseUnit     UnitOfMeasure @relation("BaseUnit", fields: [baseUnitId], references: [id])
+  purchaseUnit UnitOfMeasure? @relation("PurchaseUnit", fields: [purchaseUnitId], references: [id])
+
+  purchaseOrderItems PurchaseOrderItem[]
+  receivingItems     ReceivingItem[]
+  stockMovements     StockMovement[]
+  stockOpnameItems   StockOpnameItem[]
+  recipeItems        RecipeItem[]
+  productionItems    ProductionItem[]
+  wasteRecords       WasteRecord[]
+
+  @@index([categoryId])
+  @@index([sku])
+  @@map("items")
+}
+
+model PurchaseOrder {
+  id           Int       @id @default(autoincrement())
+  poNumber     String    @unique @map("po_number") @db.VarChar(50)
+  supplierId   Int       @map("supplier_id")
+  poDate       DateTime  @map("po_date") @db.Date
+  expectedDate DateTime? @map("expected_date") @db.Date
+  status       String    @default("DRAFT") @db.VarChar(30)
+  totalAmount  Decimal   @default(0) @map("total_amount") @db.Decimal(15, 2)
+  notes        String?   @db.Text
+  approvedBy   Int?      @map("approved_by")
+  approvedAt   DateTime? @map("approved_at")
+  createdBy    Int       @map("created_by")
+  createdAt    DateTime  @default(now()) @map("created_at")
+  updatedAt    DateTime  @updatedAt @map("updated_at")
+
+  supplier    Supplier @relation(fields: [supplierId], references: [id])
+  approver    User?    @relation("ApprovedByUser", fields: [approvedBy], references: [id])
+  creator     User     @relation("CreatedByUser", fields: [createdBy], references: [id])
+
+  items       PurchaseOrderItem[]
+  receivings  Receiving[]
+  invoices    PurchaseInvoice[]
+
+  @@index([supplierId])
+  @@index([status])
+  @@index([poDate])
+  @@map("purchase_orders")
+}
+
+model PurchaseOrderItem {
+  id          Int     @id @default(autoincrement())
+  poId        Int     @map("po_id")
+  itemId      Int     @map("item_id")
+  quantity    Decimal @db.Decimal(15, 3)
+  unitId      Int     @map("unit_id")
+  unitPrice   Decimal @map("unit_price") @db.Decimal(15, 2)
+  totalPrice  Decimal @map("total_price") @db.Decimal(15, 2)
+  receivedQty Decimal @default(0) @map("received_qty") @db.Decimal(15, 3)
+  notes       String? @db.Text
+
+  purchaseOrder PurchaseOrder @relation(fields: [poId], references: [id], onDelete: Cascade)
+  item          Item          @relation(fields: [itemId], references: [id])
+  unit          UnitOfMeasure @relation(fields: [unitId], references: [id])
+
+  receivingItems ReceivingItem[]
+
+  @@map("purchase_order_items")
+}
+
+model Receiving {
+  id              Int      @id @default(autoincrement())
+  receivingNumber String   @unique @map("receiving_number") @db.VarChar(50)
+  poId            Int      @map("po_id")
+  receivedDate    DateTime @map("received_date") @db.Date
+  notes           String?  @db.Text
+  createdBy       Int      @map("created_by")
+  createdAt       DateTime @default(now()) @map("created_at")
+
+  purchaseOrder PurchaseOrder @relation(fields: [poId], references: [id])
+  creator       User          @relation(fields: [createdBy], references: [id])
+
+  items ReceivingItem[]
+
+  @@index([poId])
+  @@map("receivings")
+}
+
+model ReceivingItem {
+  id          Int     @id @default(autoincrement())
+  receivingId Int     @map("receiving_id")
+  poItemId    Int     @map("po_item_id")
+  itemId      Int     @map("item_id")
+  quantity    Decimal @db.Decimal(15, 3)
+  unitId      Int     @map("unit_id")
+  notes       String? @db.Text
+
+  receiving     Receiving         @relation(fields: [receivingId], references: [id], onDelete: Cascade)
+  purchaseOrderItem PurchaseOrderItem @relation(fields: [poItemId], references: [id])
+  item          Item              @relation(fields: [itemId], references: [id])
+  unit          UnitOfMeasure     @relation(fields: [unitId], references: [id])
+
+  @@map("receiving_items")
+}
+
+model PurchaseInvoice {
+  id            Int       @id @default(autoincrement())
+  invoiceNumber String    @map("invoice_number") @db.VarChar(100)
+  poId          Int?      @map("po_id")
+  supplierId    Int       @map("supplier_id")
+  invoiceDate   DateTime  @map("invoice_date") @db.Date
+  totalAmount   Decimal   @map("total_amount") @db.Decimal(15, 2)
+  imageUrl      String?   @map("image_url") @db.VarChar(500)
+  status        String    @default("PENDING") @db.VarChar(30)
+  verifiedBy    Int?      @map("verified_by")
+  notes         String?   @db.Text
+  createdBy     Int       @map("created_by")
+  createdAt     DateTime  @default(now()) @map("created_at")
+
+  purchaseOrder PurchaseOrder? @relation(fields: [poId], references: [id])
+  supplier      Supplier       @relation(fields: [supplierId], references: [id])
+  verifier      User?          @relation("InvoiceVerifiedBy", fields: [verifiedBy], references: [id])
+  creator       User           @relation("InvoiceCreatedBy", fields: [createdBy], references: [id])
+
+  @@index([supplierId])
+  @@index([status])
+  @@map("purchase_invoices")
+}
+
+model StockMovement {
+  id            Int      @id @default(autoincrement())
+  itemId        Int      @map("item_id")
+  movementType  String   @map("movement_type") @db.VarChar(20)
+  referenceType String   @map("reference_type") @db.VarChar(50)
+  referenceId   Int      @map("reference_id")
+  qtyBefore     Decimal  @map("qty_before") @db.Decimal(15, 3)
+  qtyChange     Decimal  @map("qty_change") @db.Decimal(15, 3)
+  qtyAfter      Decimal  @map("qty_after") @db.Decimal(15, 3)
+  notes         String?  @db.Text
+  createdBy     Int      @map("created_by")
+  createdAt     DateTime @default(now()) @map("created_at")
+
+  item    Item          @relation(fields: [itemId], references: [id])
+  creator User          @relation(fields: [createdBy], references: [id])
+
+  @@index([itemId])
+  @@index([movementType])
+  @@index([createdAt])
+  @@map("stock_movements")
+}
+
+model StockOpname {
+  id          Int       @id @default(autoincrement())
+  opnameNumber String   @unique @map("opname_number") @db.VarChar(50)
+  opnameDate  DateTime  @map("opname_date") @db.Date
+  status      String    @default("DRAFT") @db.VarChar(30)
+  notes       String?   @db.Text
+  approvedBy  Int?      @map("approved_by")
+  approvedAt  DateTime? @map("approved_at")
+  createdBy   Int       @map("created_by")
+  createdAt   DateTime  @default(now()) @map("created_at")
+
+  approver User? @relation("OpnameApprovedBy", fields: [approvedBy], references: [id])
+  creator  User  @relation("OpnameCreatedBy", fields: [createdBy], references: [id])
+
+  items StockOpnameItem[]
+
+  @@map("stock_opnames")
+}
+
+model StockOpnameItem {
+  id        Int     @id @default(autoincrement())
+  opnameId  Int     @map("opname_id")
+  itemId    Int     @map("item_id")
+  systemQty Decimal @map("system_qty") @db.Decimal(15, 3)
+  actualQty Decimal @map("actual_qty") @db.Decimal(15, 3)
+  difference Decimal @db.Decimal(15, 3)
+  notes     String? @db.Text
+
+  opname StockOpname @relation(fields: [opnameId], references: [id], onDelete: Cascade)
+  item   Item        @relation(fields: [itemId], references: [id])
+
+  @@map("stock_opname_items")
+}
+
+model Recipe {
+  id            Int      @id @default(autoincrement())
+  name          String   @db.VarChar(200)
+  categoryId    Int      @map("category_id")
+  description   String?  @db.Text
+  yieldQuantity Decimal  @map("yield_quantity") @db.Decimal(15, 3)
+  yieldUnit     String   @default("porsi") @map("yield_unit") @db.VarChar(50)
+  sellingPrice  Decimal  @default(0) @map("selling_price") @db.Decimal(15, 2)
+  estimatedCost Decimal  @default(0) @map("estimated_cost") @db.Decimal(15, 2)
+  imageUrl      String?  @map("image_url") @db.VarChar(500)
+  isActive      Boolean  @default(true) @map("is_active")
+  version       Int      @default(1)
+  createdBy     Int      @map("created_by")
+  createdAt     DateTime @default(now()) @map("created_at")
+  updatedAt     DateTime @updatedAt @map("updated_at")
+
+  category Category @relation(fields: [categoryId], references: [id])
+  creator  User     @relation(fields: [createdBy], references: [id])
+
+  items       RecipeItem[]
+  productions Production[]
+
+  @@index([categoryId])
+  @@map("recipes")
+}
+
+model RecipeItem {
+  id       Int     @id @default(autoincrement())
+  recipeId Int     @map("recipe_id")
+  itemId   Int     @map("item_id")
+  quantity Decimal @db.Decimal(15, 6)
+  unitId   Int     @map("unit_id")
+
+  recipe Recipe        @relation(fields: [recipeId], references: [id], onDelete: Cascade)
+  item   Item          @relation(fields: [itemId], references: [id])
+  unit   UnitOfMeasure @relation(fields: [unitId], references: [id])
+
+  @@map("recipe_items")
+}
+
+model Production {
+  id               Int       @id @default(autoincrement())
+  productionNumber String    @unique @map("production_number") @db.VarChar(50)
+  productionDate   DateTime  @map("production_date") @db.Date
+  recipeId         Int       @map("recipe_id")
+  plannedQty       Decimal   @map("planned_qty") @db.Decimal(15, 3)
+  actualQty        Decimal?  @map("actual_qty") @db.Decimal(15, 3)
+  status           String    @default("PLANNED") @db.VarChar(30)
+  notes            String?   @db.Text
+  createdBy        Int       @map("created_by")
+  createdAt        DateTime  @default(now()) @map("created_at")
+  updatedAt        DateTime  @updatedAt @map("updated_at")
+
+  recipe  Recipe @relation(fields: [recipeId], references: [id])
+  creator User   @relation(fields: [createdBy], references: [id])
+
+  items ProductionItem[]
+
+  @@index([recipeId])
+  @@index([status])
+  @@index([productionDate])
+  @@map("productions")
+}
+
+model ProductionItem {
+  id          Int      @id @default(autoincrement())
+  productionId Int     @map("production_id")
+  itemId      Int      @map("item_id")
+  plannedQty  Decimal  @map("planned_qty") @db.Decimal(15, 6)
+  actualQty   Decimal? @map("actual_qty") @db.Decimal(15, 6)
+  unitId      Int      @map("unit_id")
+
+  production Production    @relation(fields: [productionId], references: [id], onDelete: Cascade)
+  item       Item          @relation(fields: [itemId], references: [id])
+  unit       UnitOfMeasure @relation(fields: [unitId], references: [id])
+
+  @@map("production_items")
+}
+
+model WasteRecord {
+  id        Int      @id @default(autoincrement())
+  wasteDate DateTime @map("waste_date") @db.Date
+  itemId    Int      @map("item_id")
+  quantity  Decimal  @db.Decimal(15, 3)
+  unitId    Int      @map("unit_id")
+  category  String   @db.VarChar(50)
+  notes     String?  @db.Text
+  imageUrl  String?  @map("image_url") @db.VarChar(500)
+  createdBy Int      @map("created_by")
+  createdAt DateTime @default(now()) @map("created_at")
+
+  item    Item          @relation(fields: [itemId], references: [id])
+  unit    UnitOfMeasure @relation(fields: [unitId], references: [id])
+  creator User          @relation(fields: [createdBy], references: [id])
+
+  @@index([wasteDate])
+  @@index([itemId])
+  @@map("waste_records")
+}
+
+model AuditLog {
+  id         Int      @id @default(autoincrement())
+  userId     Int      @map("user_id")
+  action     String   @db.VarChar(50)
+  entityType String   @map("entity_type") @db.VarChar(50)
+  entityId   Int      @map("entity_id")
+  oldValues  Json?    @map("old_values")
+  newValues  Json?    @map("new_values")
+  ipAddress  String?  @map("ip_address") @db.VarChar(50)
+  userAgent  String?  @map("user_agent") @db.VarChar(500)
+  createdAt  DateTime @default(now()) @map("created_at")
+
+  user User @relation(fields: [userId], references: [id])
+
+  @@index([entityType, entityId])
+  @@index([userId])
+  @@index([createdAt])
+  @@map("audit_logs")
+}
