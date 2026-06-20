@@ -15,6 +15,8 @@ import { WasteModule } from './modules/waste/waste.module';
 import { DashboardModule } from './modules/dashboard/dashboard.module';
 import { AuditLogModule } from './modules/audit-log/audit-log.module';
 import { ReportModule } from './modules/report/report.module';
+import { CategoryModule } from './modules/category/category.module';
+import { UnitModule } from './modules/unit/unit.module';
 
 @Module({
   imports: [
@@ -34,6 +36,8 @@ import { ReportModule } from './modules/report/report.module';
     DashboardModule,
     AuditLogModule,
     ReportModule,
+    CategoryModule,
+    UnitModule,
   ],
 })
 export class AppModule {}

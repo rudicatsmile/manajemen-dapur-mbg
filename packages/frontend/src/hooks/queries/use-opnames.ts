@@ -11,7 +11,7 @@ export function useOpnameList(params?: { page?: number; perPage?: number; status
   return useQuery({
     queryKey: [...QUERY_KEY, params],
     queryFn: async () => {
-      const res = await apiClient.get('/opnames', { params });
+      const res = await apiClient.get('/stock/opnames', { params });
       return res.data;
     },
   });
@@ -32,7 +32,7 @@ export function useCreateOpname() {
   const qc = useQueryClient();
   return useMutation({
     mutationFn: async (data: CreateOpnameInput) => {
-      const res = await apiClient.post('/opnames', data);
+      const res = await apiClient.post('/stock/opnames', data);
       return res.data;
     },
     onSuccess: () => {
