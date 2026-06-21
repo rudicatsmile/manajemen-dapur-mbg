@@ -92,7 +92,7 @@ export function ReceivingForm() {
                 {fields.map((field, index) => {
                   const poItem = poDetail?.items?.[index];
                   return (
-                    <div key={field.id} className="grid gap-3 sm:grid-cols-4 items-end border rounded-lg p-3">
+                    <div key={field.id} className="grid gap-3 sm:grid-cols-3 lg:grid-cols-6 items-end border rounded-lg p-3">
                       <div>
                         <p className="text-sm font-medium">{poItem?.item?.name}</p>
                         <p className="text-xs text-muted-foreground">Dipesan: {poItem?.quantity} {poItem?.unit?.name}</p>
@@ -102,6 +102,18 @@ export function ReceivingForm() {
                           <FormLabel>Qty Diterima</FormLabel>
                           <FormControl><Input type="number" min={0} {...f} onChange={(e) => f.onChange(Number(e.target.value))} /></FormControl>
                           <FormMessage />
+                        </FormItem>
+                      )} />
+                      <FormField control={form.control} name={`items.${index}.batchNumber` as `items.${number}.notes`} render={({ field: f }) => (
+                        <FormItem>
+                          <FormLabel>No. Batch</FormLabel>
+                          <FormControl><Input placeholder="No. Batch (opsional)" {...f} value={f.value ?? ''} /></FormControl>
+                        </FormItem>
+                      )} />
+                      <FormField control={form.control} name={`items.${index}.expiryDate` as `items.${number}.notes`} render={({ field: f }) => (
+                        <FormItem>
+                          <FormLabel>Tanggal Expired</FormLabel>
+                          <FormControl><Input type="date" {...f} value={f.value ?? ''} /></FormControl>
                         </FormItem>
                       )} />
                       <FormField control={form.control} name={`items.${index}.notes`} render={({ field: f }) => (

@@ -1,6 +1,7 @@
 import { Injectable, NotFoundException, BadRequestException } from '@nestjs/common';
 import { PrismaService } from '../../prisma/prisma.service';
 import { PriceHistoryService } from '../price-history/price-history.service';
+import { BatchTrackingService } from '../batch-tracking/batch-tracking.service';
 import { paginate, paginationMeta } from '../../common/helpers/pagination.helper';
 import { generateDocNumber } from '../../common/helpers/doc-number.helper';
 import { Decimal } from '@prisma/client/runtime/library';
@@ -10,6 +11,7 @@ export class ReceivingService {
   constructor(
     private prisma: PrismaService,
     private priceHistoryService: PriceHistoryService,
+    private batchTrackingService: BatchTrackingService,
   ) {}
 
   async findAll(page: number, perPage: number, search?: string) {
@@ -168,6 +170,25 @@ export class ReceivingService {
         pr.quantity,
         pr.poId,
         pr.date,
+      );
+    }
+
+    // Create item batches for FIFO & expiry tracking
+    for (const rcvItem of result.receiving.items) {
+      const inputItem = data.items.find((i: any) => i.itemId === rcvItem.itemId);
+      const batchNumber = inputItem?.batchNumber
+        || `RCV-${result.receiving.receivingNumber}-${rcvItem.itemId}`;
+      const expiryDate = inputItem?.expiryDate
+        ? new Date(inputItem.expiryDate)
+        : undefined;
+
+      await this.batchTrackingService.createBatch(
+        rcvItem.itemId,
+        batchNumber,
+        expiryDate,
+        rcvItem.id,
+        Number(rcvItem.quantity),
+        new Date(data.receivedDate),
       );
     }
 

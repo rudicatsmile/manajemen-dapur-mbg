@@ -8,7 +8,7 @@ import {
   Package, ArrowLeftRight, ClipboardCheck, ChefHat, CalendarDays,
   Trash2, Calculator, BarChart3, TrendingUp, TrendingDown, Users, Tag, Ruler,
   ChevronDown, ChevronRight, Menu, Bell, Award, LineChart, Calendar,
-  CalendarRange, UtensilsCrossed,
+  CalendarRange, UtensilsCrossed, Timer,
 } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { useAuthStore } from '@/stores/auth-store';
@@ -57,6 +57,7 @@ const navGroups: NavGroup[] = [
       { title: 'Mutasi Stok', href: '/stok/mutasi', icon: ArrowLeftRight },
       { title: 'Stok Opname', href: '/stok/opname', icon: ClipboardCheck },
       { title: 'Histori Harga', href: '/stok/histori-harga', icon: TrendingDown },
+      { title: 'Batch & Expiry', href: '/stok/batch-tracking', icon: Timer },
     ],
   },
   {

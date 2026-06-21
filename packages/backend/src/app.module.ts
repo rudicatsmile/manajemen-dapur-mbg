@@ -22,6 +22,7 @@ import { SupplierRatingModule } from './modules/supplier-rating/supplier-rating.
 import { PriceHistoryModule } from './modules/price-history/price-history.module';
 import { ForecastingModule } from './modules/forecasting/forecasting.module';
 import { MealPlanModule } from './modules/meal-plan/meal-plan.module';
+import { BatchTrackingModule } from './modules/batch-tracking/batch-tracking.module';
 
 @Module({
   imports: [
@@ -48,6 +49,7 @@ import { MealPlanModule } from './modules/meal-plan/meal-plan.module';
     PriceHistoryModule,
     ForecastingModule,
     MealPlanModule,
+    BatchTrackingModule,
   ],
 })
 export class AppModule {}

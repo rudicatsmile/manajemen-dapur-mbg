@@ -2,7 +2,7 @@
 
 import { useState } from 'react';
 import { useRouter } from 'next/navigation';
-import { Bell, PackageX, Clock, AlertTriangle, Info, Check } from 'lucide-react';
+import { Bell, PackageX, Clock, AlertTriangle, Info, Check, Timer } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Card } from '@/components/ui/card';
 import {
@@ -36,6 +36,8 @@ function getNotificationIcon(type: string) {
       return <Clock className="h-5 w-5 text-yellow-500" />;
     case 'PO_OVERDUE':
       return <AlertTriangle className="h-5 w-5 text-orange-500" />;
+    case 'EXPIRY_ALERT':
+      return <Timer className="h-5 w-5 text-orange-500" />;
     default:
       return <Info className="h-5 w-5 text-blue-500" />;
   }

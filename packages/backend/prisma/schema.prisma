@@ -144,6 +144,7 @@ model Item {
   wasteRecords       WasteRecord[]
   priceHistory       PriceHistory[]
   demandForecasts    DemandForecast[]
+  batches            ItemBatch[]
 
   @@index([categoryId])
   @@index([sku])
@@ -230,6 +231,7 @@ model ReceivingItem {
   purchaseOrderItem PurchaseOrderItem @relation(fields: [poItemId], references: [id])
   item          Item              @relation(fields: [itemId], references: [id])
   unit          UnitOfMeasure     @relation(fields: [unitId], references: [id])
+  batch         ItemBatch?
 
   @@map("receiving_items")
 }
@@ -572,4 +574,25 @@ model MealPlanTemplateItem {
 
   @@index([templateId])
   @@map("meal_plan_template_items")
+}
+
+model ItemBatch {
+  id              Int       @id @default(autoincrement())
+  itemId          Int       @map("item_id")
+  batchNumber     String    @map("batch_number") @db.VarChar(100)
+  expiryDate      DateTime? @map("expiry_date") @db.Date
+  receivingItemId Int?      @unique @map("receiving_item_id")
+  initialQty      Decimal   @map("initial_qty") @db.Decimal(15, 3)
+  currentQty      Decimal   @map("current_qty") @db.Decimal(15, 3)
+  status          String    @default("AVAILABLE") @db.VarChar(20)
+  receivedDate    DateTime  @map("received_date") @db.Date
+  notes           String?   @db.Text
+  createdAt       DateTime  @default(now()) @map("created_at")
+
+  item          Item           @relation(fields: [itemId], references: [id])
+  receivingItem ReceivingItem? @relation(fields: [receivingItemId], references: [id])
+
+  @@index([itemId, status])
+  @@index([expiryDate])
+  @@map("item_batches")
 }

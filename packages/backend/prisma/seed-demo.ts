@@ -834,6 +834,62 @@ async function main() {
 
   console.log('✓ 1 meal plan (active, 19 items) + 1 template (10 items)');
 
+  // ─── 18. ITEM BATCHES (FIFO & Expiry Tracking) ──────────
+  const batchData = [
+    // From receiving 1 (55 days ago) - PT Sumber Makmur
+    { item: 'Ayam Fillet', batch: 'BTH-AYM-001', qty: 20, daysAgo: 55, expiryDaysFromNow: -3, notes: 'Batch pertama' },
+    { item: 'Daging Sapi Has Dalam', batch: 'BTH-DGS-001', qty: 5, daysAgo: 55, expiryDaysFromNow: 2, notes: 'Mendekati expired' },
+    // From receiving 2 (45 days ago) - CV Bahan Segar
+    { item: 'Wortel', batch: 'BTH-WRT-001', qty: 10, daysAgo: 45, expiryDaysFromNow: -5 },
+    { item: 'Kentang', batch: 'BTH-KTG-001', qty: 10, daysAgo: 45, expiryDaysFromNow: 5 },
+    { item: 'Tomat', batch: 'BTH-TMT-001', qty: 5, daysAgo: 45, expiryDaysFromNow: 1, notes: 'Segera pakai!' },
+    // From receiving 3 (40 days ago) - UD Rempah
+    { item: 'Bawang Merah', batch: 'BTH-BWM-001', qty: 10, daysAgo: 40, expiryDaysFromNow: 30 },
+    { item: 'Bawang Putih', batch: 'BTH-BWP-001', qty: 8, daysAgo: 40, expiryDaysFromNow: 45 },
+    { item: 'Cabai Merah Keriting', batch: 'BTH-CBM-001', qty: 5, daysAgo: 40, expiryDaysFromNow: 3 },
+    // From receiving 4 (30 days ago)
+    { item: 'Ayam Fillet', batch: 'BTH-AYM-002', qty: 25, daysAgo: 30, expiryDaysFromNow: 10 },
+    { item: 'Udang Kupas', batch: 'BTH-UDG-001', qty: 10, daysAgo: 30, expiryDaysFromNow: 7 },
+    // From receiving 7 (12 days ago) - most recent
+    { item: 'Ayam Fillet', batch: 'BTH-AYM-003', qty: 30, daysAgo: 12, expiryDaysFromNow: 20 },
+    { item: 'Telur Ayam', batch: 'BTH-TLR-001', qty: 200, daysAgo: 12, expiryDaysFromNow: 14 },
+    // From receiving 8 (7 days ago)
+    { item: 'Bawang Merah', batch: 'BTH-BWM-002', qty: 8, daysAgo: 7, expiryDaysFromNow: 25 },
+    { item: 'Cabai Merah Keriting', batch: 'BTH-CBM-002', qty: 5, daysAgo: 7, expiryDaysFromNow: 12 },
+    // Items without expiry (long shelf life)
+    { item: 'Beras Premium', batch: 'BTH-BRS-001', qty: 60, daysAgo: 50, expiryDaysFromNow: null },
+    { item: 'Garam', batch: 'BTH-GRM-001', qty: 15, daysAgo: 50, expiryDaysFromNow: null },
+    { item: 'Minyak Goreng', batch: 'BTH-MYK-001', qty: 20, daysAgo: 35, expiryDaysFromNow: 60 },
+    { item: 'Tepung Terigu', batch: 'BTH-TPG-001', qty: 30, daysAgo: 40, expiryDaysFromNow: 90 },
+  ];
+
+  for (const b of batchData) {
+    const itemId = items[b.item];
+    if (!itemId) continue;
+
+    const expiryDate = b.expiryDaysFromNow !== null
+      ? new Date(new Date().getTime() + b.expiryDaysFromNow * 24 * 60 * 60 * 1000)
+      : null;
+
+    // For expired batches (negative expiryDaysFromNow), set status and reduce qty
+    const isExpired = b.expiryDaysFromNow !== null && b.expiryDaysFromNow < 0;
+
+    await prisma.itemBatch.create({
+      data: {
+        itemId,
+        batchNumber: b.batch,
+        expiryDate,
+        initialQty: d(b.qty),
+        currentQty: isExpired ? d(0) : d(Math.max(0, Math.round(b.qty * 0.6 * 100) / 100)),
+        status: isExpired ? 'EXPIRED' : 'AVAILABLE',
+        receivedDate: daysAgo(b.daysAgo),
+        notes: (b as any).notes || null,
+      },
+    });
+  }
+
+  console.log('✓ 18 item batches (with expiry dates for demo)');
+
   // ─── SUMMARY ──────────────────────────────────────────────
   console.log('\n✅ Demo seed selesai!\n');
   console.log('Akun login:');
@@ -848,6 +904,7 @@ async function main() {
   console.log('  7 notifikasi, 8 audit log, histori harga');
   console.log('  4 seasonal factors, 32 demand forecasts');
   console.log('  1 meal plan (19 items), 1 template (10 items)');
+  console.log('  18 item batches (FIFO & expiry tracking)');
 }
 
 main()
