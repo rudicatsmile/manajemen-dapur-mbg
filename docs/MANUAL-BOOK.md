@@ -1,6 +1,6 @@
 # Manual Book — Manajemen Dapur MBG
 
-**Versi**: 1.3
+**Versi**: 1.4
 **Terakhir Diperbarui**: 21 Juni 2026
 
 ---
@@ -71,6 +71,19 @@
    - 6.13 [Alur Kerja Lengkap](#613-alur-kerja-lengkap)
    - 6.14 [Tips & Best Practices](#614-tips--best-practices)
    - 6.15 [FAQ Meal Prep Planner](#615-faq-meal-prep-planner)
+7. [FIFO & Expiry Date Tracking](#7-fifo--expiry-date-tracking)
+   - 7.1 [Tentang FIFO & Batch Tracking](#71-tentang-fifo--batch-tracking)
+   - 7.2 [Cara Batch Terbentuk](#72-cara-batch-terbentuk)
+   - 7.3 [Dashboard Batch & Expiry](#73-dashboard-batch--expiry)
+   - 7.4 [Tabel Item Mendekati Expired](#74-tabel-item-mendekati-expired)
+   - 7.5 [Detail Batch Per Item (FIFO Order)](#75-detail-batch-per-item-fifo-order)
+   - 7.6 [FIFO Suggestion Tool](#76-fifo-suggestion-tool)
+   - 7.7 [Menandai Batch Expired](#77-menandai-batch-expired)
+   - 7.8 [Alert Expiry Otomatis](#78-alert-expiry-otomatis)
+   - 7.9 [Proses Auto-Expire](#79-proses-auto-expire)
+   - 7.10 [Input Batch Saat Receiving](#710-input-batch-saat-receiving)
+   - 7.11 [Tips & Best Practices](#711-tips--best-practices)
+   - 7.12 [FAQ FIFO & Expiry](#712-faq-fifo--expiry)
 
 ---
 
@@ -1684,6 +1697,377 @@ A: Saat ini belum ada fitur print/PDF khusus untuk jadwal. Anda bisa menggunakan
 
 ---
 
+## 7. FIFO & Expiry Date Tracking
+
+### 7.1 Tentang FIFO & Batch Tracking
+
+FIFO (First In, First Out) & Expiry Tracking adalah sistem yang memecah stok setiap item bahan baku ke dalam **batch** — setiap penerimaan barang menjadi 1 batch tersendiri dengan nomor batch dan tanggal kadaluarsa (jika ada).
+
+**Apa itu Batch?**
+Batch adalah satu kelompok barang yang diterima pada waktu yang sama. Misalnya: "5 kg Ayam Fillet diterima tanggal 15 Juni, expired 25 Juni" = 1 batch.
+
+**Apa itu FIFO?**
+First In, First Out = barang yang **pertama masuk, harus pertama keluar**. Barang yang paling lama di gudang (atau paling dekat expired) harus dipakai duluan. Ini prinsip dasar food safety.
+
+**Manfaat:**
+- **Zero expired waste** — tahu persis batch mana yang mendekati expired, prioritas pakai duluan
+- **Food safety compliance** — bukti bahwa bahan digunakan sesuai prinsip FIFO
+- **Alert otomatis** — notifikasi H-7, H-3, H-1 sebelum expired
+- **Visibilitas penuh** — tahu setiap kg bahan: dari mana, kapan datang, kapan expired, berapa sisa
+- **Keputusan cepat** — batch mendekati expired → segera pakai atau diskon, bukan buang
+
+### 7.2 Cara Batch Terbentuk
+
+Batch **otomatis dibuat** setiap kali Anda menerima barang (receiving):
+
+```
+Terima Barang (Receiving)
+        │
+        ├── Item: Ayam Fillet, 20 kg
+        │   Batch#: BTH-AYM-003 (opsional, auto-generate jika kosong)
+        │   Expired: 10 Jul 2026 (opsional)
+        │           │
+        │           ▼
+        │   ┌─────────────────────────────┐
+        │   │ ItemBatch #15               │
+        │   │ Ayam Fillet                 │
+        │   │ Batch: BTH-AYM-003         │
+        │   │ Qty Awal: 20 kg            │
+        │   │ Qty Sisa: 20 kg            │
+        │   │ Expired: 10 Jul 2026       │
+        │   │ Status: AVAILABLE          │
+        │   └─────────────────────────────┘
+        │
+        ├── Item: Bawang Merah, 8 kg
+        │   (tanpa batch# dan expired)
+        │           │
+        │           ▼
+        │   ┌─────────────────────────────┐
+        │   │ ItemBatch #16               │
+        │   │ Bawang Merah               │
+        │   │ Batch: RCV-RCV-20260621-001│ ← auto-generated
+        │   │ Qty Awal: 8 kg             │
+        │   │ Expired: -                 │ ← tidak ada
+        │   │ Status: AVAILABLE          │
+        │   └─────────────────────────────┘
+```
+
+**Input batch saat receiving bersifat opsional:**
+- Jika **isi batch number** → dipakai sebagai ID batch
+- Jika **tidak diisi** → sistem auto-generate dari nomor receiving
+- Jika **isi tanggal expired** → dipakai untuk FIFO ordering dan alert
+- Jika **tidak diisi** → batch dianggap tidak punya expiry (simpan tanpa batas)
+
+### 7.3 Dashboard Batch & Expiry
+
+**Cara mengakses:**
+1. Di sidebar, klik **Stok Gudang**
+2. Klik **Batch & Expiry**
+
+**6 Summary Cards:**
+
+```
+┌──────────────┐ ┌──────────────┐ ┌──────────────┐
+│ 📦 Total     │ │ ❌ Sudah     │ │ 💰 Nilai     │
+│ Batch Aktif  │ │ Expired      │ │ At-Risk      │
+│     42       │ │      3       │ │ Rp 850.000   │
+└──────────────┘ └──────────────┘ └──────────────┘
+┌──────────────┐ ┌──────────────┐ ┌──────────────┐
+│ 🔴 Expired   │ │ 🟠 Expired   │ │ 🟡 Expired   │
+│ Besok (H-1)  │ │ 3 Hari (H-3) │ │ 7 Hari (H-7) │
+│      2       │ │      5       │ │     12       │
+└──────────────┘ └──────────────┘ └──────────────┘
+```
+
+| Card | Penjelasan |
+|------|-----------|
+| **Total Batch Aktif** | Jumlah batch dengan status AVAILABLE (masih ada stok) |
+| **Sudah Expired** | Batch yang sudah melewati tanggal expired tapi belum diproses |
+| **Nilai At-Risk** | Total nilai Rupiah dari batch yang akan expired dalam 7 hari = Σ(sisa qty × harga terakhir) |
+| **Expired Besok (H-1)** | Batch yang expired besok — **prioritas tertinggi!** |
+| **Expired 3 Hari (H-3)** | Batch yang expired dalam 3 hari — perlu segera dipakai |
+| **Expired 7 Hari (H-7)** | Batch yang expired dalam 7 hari — mulai direncanakan |
+
+**Tombol aksi di header:**
+- **"Cek Expiry Alert"** (🔔) — kirim notifikasi ke Kitchen Manager dan Admin untuk batch yang mendekati expired
+- **"Proses Expired Otomatis"** (⚠️) — tandai semua batch yang sudah melewati tanggal expired sebagai EXPIRED dan buat waste record otomatis
+
+### 7.4 Tabel Item Mendekati Expired
+
+Di bawah summary cards, terdapat tabel batch yang mendekati expired:
+
+```
+┌──────────────────────────────────────────────────────────────────┐
+│  Filter: [H-1] [H-3] [H-7] [H-30] [Semua]                     │
+│                                                                  │
+│  Item          Batch#       Terima    Expired   Sisa   Hari  Aksi│
+│  ─────────────────────────────────────────────────────────────── │
+│  Tomat         BTH-TMT-001  7 Mei    22 Jun    3 kg    1    [!] │ ← merah
+│  Daging Sapi   BTH-DGS-001  27 Apr   23 Jun    3 kg    2    [!] │ ← oranye
+│  Cabai Merah   BTH-CBM-001  12 Mei   24 Jun    3 kg    3    [!] │ ← oranye
+│  Kentang       BTH-KTG-001  7 Mei    26 Jun    6 kg    5    [!] │ ← kuning
+│  Udang Kupas   BTH-UDG-001  22 Mei   28 Jun    6 kg    7    [!] │ ← kuning
+└──────────────────────────────────────────────────────────────────┘
+```
+
+**Kode warna urgency (konsisten di seluruh aplikasi):**
+
+| Hari Tersisa | Warna | Badge | Background Baris |
+|--------------|-------|-------|------------------|
+| Sudah expired (< 0) | Merah | "EXPIRED" | Merah muda |
+| Hari ini (0) | Merah | "HARI INI" | Merah muda |
+| 1 hari | Merah | "1 hari" | Merah muda |
+| 2-3 hari | Oranye | "2 hari" / "3 hari" | Oranye muda |
+| 4-7 hari | Kuning | "X hari" | Normal |
+| > 7 hari | Hijau | "X hari" | Normal |
+| Tidak ada expiry | Abu-abu | "Tidak ada" | Normal |
+
+**Filter cepat:**
+- **H-1**: hanya batch yang expired besok atau sudah expired
+- **H-3**: batch expired dalam 3 hari
+- **H-7**: batch expired dalam 7 hari (default)
+- **H-30**: batch expired dalam 30 hari
+- **Semua**: tampilkan semua batch aktif
+
+**Kolom tabel:**
+
+| Kolom | Penjelasan |
+|-------|-----------|
+| **Item** | Nama bahan + SKU |
+| **Batch #** | Nomor batch |
+| **Tanggal Terima** | Kapan batch ini diterima |
+| **Tanggal Expired** | Kapan batch ini kadaluarsa |
+| **Sisa Qty** | Jumlah tersisa di batch (+ satuan) |
+| **Nilai** | Sisa qty × harga terakhir (Rp) |
+| **Hari Tersisa** | Badge warna sesuai urgency |
+| **Status** | AVAILABLE (hijau) / EXPIRED (merah) / DEPLETED (abu) |
+| **Aksi** | "Lihat" → detail batch item, "Tandai Expired" → proses sebagai waste |
+
+### 7.5 Detail Batch Per Item (FIFO Order)
+
+Klik **"Lihat"** pada baris item di tabel untuk melihat semua batch item tersebut dalam urutan FIFO:
+
+```
+┌──────────────────────────────────────────────────────────────┐
+│  ← Kembali                                                   │
+│  Ayam Fillet (ITM-PR-001)        Total Stok: 25 kg          │
+│                                                              │
+│  ┌──────────┐ ┌──────────┐ ┌──────────┐                    │
+│  │ Total    │ │ Batch    │ │ Mendekati│                    │
+│  │ Stok     │ │ Aktif    │ │ Expired  │                    │
+│  │  25 kg   │ │    3     │ │    1     │                    │
+│  └──────────┘ └──────────┘ └──────────┘                    │
+│                                                              │
+│  DAFTAR BATCH (FIFO — yang di atas dipakai duluan)          │
+│  ┌──────────────────────────────────────────────────────┐   │
+│  │ #  Batch#       Terima   Expired   Awal  Sisa  Status│   │
+│  ├──────────────────────────────────────────────────────┤   │
+│  │ 1  BTH-AYM-001  27 Apr  EXPIRED   20kg   0kg   EXP  │   │
+│  │ 2  BTH-AYM-002  22 Mei  1 Jul     25kg  15kg  ████░ │ ← FIFO: Pakai duluan!
+│  │ 3  BTH-AYM-003  9 Jun   11 Jul    30kg  18kg  ████░ │   │
+│  └──────────────────────────────────────────────────────┘   │
+│                                                              │
+│  ┌─ FIFO Suggestion Tool ────────────────────────────────┐  │
+│  │ Berapa qty yang dibutuhkan?  [10     ]  [Lihat Saran] │  │
+│  │                                                        │  │
+│  │ Hasil: Ambil dari batch berikut:                       │  │
+│  │ • BTH-AYM-002: 10 kg (sisa setelah: 5 kg)            │  │
+│  └────────────────────────────────────────────────────────┘  │
+└──────────────────────────────────────────────────────────────┘
+```
+
+**Urutan FIFO:**
+Batch ditampilkan dari atas ke bawah berdasarkan:
+1. **Tanggal expired terdekat** (paling dekat expired di atas)
+2. Jika tidak ada expiry → berdasarkan **tanggal terima tertua**
+3. Batch pertama yang AVAILABLE diberi label **"FIFO: Pakai duluan!"**
+
+**Progress bar per batch:**
+Menunjukkan seberapa banyak batch sudah terpakai:
+- Hijau (> 50% sisa): masih banyak
+- Kuning (20-50% sisa): mulai habis
+- Merah (< 20% sisa): hampir habis
+
+**Status batch:**
+
+| Status | Warna | Arti |
+|--------|-------|------|
+| AVAILABLE | Hijau | Masih ada stok, bisa dipakai |
+| DEPLETED | Abu-abu | Sudah habis terpakai (normal) |
+| EXPIRED | Merah | Kadaluarsa, sudah diproses sebagai waste |
+| WASTED | Merah tua | Dibuang karena rusak/alasan lain |
+
+### 7.6 FIFO Suggestion Tool
+
+Di bagian bawah halaman detail batch, terdapat tool untuk mensimulasikan: "Jika saya butuh X kg, batch mana yang harus saya ambil?"
+
+**Cara menggunakan:**
+1. Masukkan jumlah qty yang dibutuhkan (mis. 10 kg)
+2. Klik **"Lihat Saran FIFO"**
+3. Sistem menghitung dan menampilkan:
+
+```
+Butuh: 10 kg Ayam Fillet
+
+Ambil dari:
+┌─────────────────────────────────────────────────┐
+│ Batch          Ambil    Sisa Setelah Diambil     │
+│ BTH-AYM-002   10 kg    5 kg                     │
+└─────────────────────────────────────────────────┘
+```
+
+Jika 1 batch tidak cukup, sistem memecah ke batch berikutnya:
+
+```
+Butuh: 20 kg Ayam Fillet
+
+Ambil dari:
+┌─────────────────────────────────────────────────┐
+│ Batch          Ambil    Sisa Setelah Diambil     │
+│ BTH-AYM-002   15 kg    0 kg (habis)             │
+│ BTH-AYM-003    5 kg    13 kg                    │
+└─────────────────────────────────────────────────┘
+```
+
+**Ini adalah simulasi** — tidak mengurangi stok aktual. Gunakan sebagai panduan saat mengambil bahan dari gudang.
+
+### 7.7 Menandai Batch Expired
+
+Jika batch sudah expired atau barang sudah tidak layak pakai:
+
+1. Klik tombol **"Tandai Expired"** pada baris batch
+2. Konfirmasi: "Batch ini akan ditandai expired. Sisa qty akan dicatat sebagai waste. Lanjutkan?"
+3. Klik **"Ya, Tandai Expired"**
+4. Sistem akan:
+   - Mengubah status batch menjadi **EXPIRED**
+   - Mengatur `currentQty` menjadi 0
+   - Membuat **WasteRecord** otomatis dengan kategori "EXPIRED"
+   - Membuat **StockMovement** (pengurangan stok)
+   - Mengurangi `Item.currentStock`
+
+**Penting:** Aksi ini **tidak bisa dibatalkan**. Pastikan batch memang sudah expired/tidak layak pakai.
+
+### 7.8 Alert Expiry Otomatis
+
+Sistem dapat mengirim notifikasi ke Kitchen Manager dan Admin untuk batch yang mendekati expired.
+
+**Cara trigger manual:**
+Klik tombol **"Cek Expiry Alert"** (🔔) di dashboard.
+
+**Alert yang dikirim:**
+
+| Level | Judul Notifikasi | Contoh |
+|-------|-----------------|--------|
+| H-7 | "Batch mendekati expired (7 hari)" | "Batch BTH-UDG-001 (Udang Kupas) akan expired dalam 7 hari (28 Jun). Sisa: 6 kg" |
+| H-3 | "Batch akan segera expired (3 hari)" | "Batch BTH-CBM-001 (Cabai Merah) akan expired dalam 3 hari (24 Jun). Sisa: 3 kg" |
+| H-1 | "URGENT: Batch expired besok!" | "Batch BTH-TMT-001 (Tomat) akan expired BESOK (22 Jun). Sisa: 3 kg. Segera gunakan!" |
+
+**Siapa yang menerima:**
+
+| Role | Menerima Alert? |
+|------|----------------|
+| Kitchen Manager | ✅ Ya (yang harus action) |
+| Admin | ✅ Ya (monitoring) |
+| Owner | ❌ Tidak |
+| Purchaser | ❌ Tidak |
+
+**Idempotent:** Alert tidak akan duplikat — jika sudah dikirim hari ini untuk batch yang sama, tidak akan dikirim lagi.
+
+**Di mana alert muncul:** Notification bell (🔔) di header dengan ikon ⏱️ (Timer) berwarna oranye.
+
+### 7.9 Proses Auto-Expire
+
+Tombol **"Proses Expired Otomatis"** (⚠️) akan:
+1. Scan semua batch dimana `expiryDate < hari ini` DAN `status = AVAILABLE`
+2. Untuk setiap batch yang ditemukan:
+   - Set status → EXPIRED
+   - Set currentQty → 0
+   - Buat WasteRecord (kategori EXPIRED)
+   - Buat StockMovement
+   - Kurangi Item.currentStock
+3. Menampilkan: "X batch expired otomatis diproses"
+
+**Kapan menjalankan ini?**
+- Idealnya setiap pagi sebelum produksi dimulai
+- Atau minimal 1x per hari untuk memastikan batch expired langsung tercatat sebagai waste
+
+### 7.10 Input Batch Saat Receiving
+
+Saat menerima barang di halaman Penerimaan (Receiving), setiap item sekarang memiliki 2 field tambahan:
+
+```
+┌───────────────────────────────────────────────────────────────┐
+│  Item: Ayam Fillet                                            │
+│  Qty Diterima: [20    ]  Unit: [kg]                          │
+│  No. Batch:    [BTH-AYM-004    ]  (opsional)                 │
+│  Tgl Expired:  [2026-07-10     ]  (opsional)                 │
+└───────────────────────────────────────────────────────────────┘
+```
+
+**Tips pengisian:**
+- **No. Batch**: Gunakan nomor dari label kemasan supplier. Jika tidak ada, biarkan kosong (auto-generate)
+- **Tanggal Expired**: Lihat label kemasan. Untuk bahan segar tanpa label (sayur, daging), estimasikan berdasarkan umur simpan standar:
+  - Daging ayam/sapi segar: +3-5 hari
+  - Sayuran: +5-7 hari
+  - Bumbu kering: +30-90 hari
+  - Beras/tepung: tidak perlu diisi (long shelf life)
+
+### 7.11 Tips & Best Practices
+
+1. **Jalankan "Cek Expiry Alert" setiap pagi** — Buat ini jadi rutinitas agar Kitchen Manager selalu tahu batch apa yang perlu diprioritaskan hari ini.
+
+2. **Jalankan "Proses Auto-Expire" harian** — Batch expired yang tidak diproses akan tetap menghitung sebagai stok, sehingga data stok tidak akurat.
+
+3. **Selalu input tanggal expired untuk bahan perishable** — Daging, seafood, sayuran, susu — ini bahan yang paling berisiko expired. Bahan kering (beras, garam, gula) tidak wajib.
+
+4. **Gunakan FIFO Suggestion Tool** — Sebelum mengambil bahan dari gudang, cek saran FIFO agar selalu pakai batch tertua dulu.
+
+5. **Review H-7 setiap Senin** — Pada awal minggu, lihat batch apa yang akan expired minggu ini. Prioritaskan dalam jadwal Meal Prep.
+
+6. **Integrasikan dengan Meal Prep** — Jika ada batch yang mendekati expired → jadwalkan resep yang menggunakan bahan tersebut di Meal Prep Planner.
+
+7. **Gunakan nomor batch dari supplier** — Jika supplier sudah memberikan nomor lot/batch di kemasan, gunakan itu agar traceable dari sumber.
+
+8. **Perhatikan "Nilai At-Risk"** — Ini menunjukkan berapa Rupiah yang terancam hilang jika batch-batch tersebut tidak dipakai sebelum expired. Angka ini harus sekecil mungkin.
+
+9. **Batch DEPLETED itu normal** — Batch yang habis terpakai (DEPLETED) bukan masalah. Yang bermasalah adalah batch EXPIRED — ini waste yang seharusnya bisa dicegah.
+
+10. **Bandingkan EXPIRED vs DEPLETED** — Rasio batch expired / total batch adalah indikator efisiensi. Target: < 5% batch expired.
+
+### 7.12 FAQ FIFO & Expiry
+
+**Q: Apakah saya wajib input batch number dan expiry date saat receiving?**
+A: Tidak wajib — kedua field bersifat opsional. Tapi **sangat direkomendasikan** untuk bahan perishable (daging, seafood, sayuran, susu). Untuk bahan kering yang tahan lama (beras, garam, minyak), tidak perlu expiry date.
+
+**Q: Apa yang terjadi jika tidak input expiry date?**
+A: Batch tetap dibuat tapi tanpa tanggal expired. Batch ini tidak akan muncul di alert expiry dan dianggap bisa disimpan tanpa batas. FIFO ordering akan berdasarkan tanggal terima (yang tertua duluan).
+
+**Q: Apakah produksi otomatis deduct dari batch?**
+A: Saat ini, produksi mengurangi `Item.currentStock` secara keseluruhan. Fitur deduct per-batch saat produksi akan tersedia di update berikutnya. Sementara itu, gunakan FIFO Suggestion Tool sebagai panduan manual.
+
+**Q: Bagaimana jika batch number sama untuk 2 receiving berbeda?**
+A: Batch number boleh sama — sistem menggunakan ID internal untuk membedakan. Tapi disarankan menggunakan nomor unik per receiving agar tracking lebih jelas.
+
+**Q: "Proses Auto-Expire" apakah aman dijalankan berkali-kali?**
+A: Ya, aman. Sistem hanya memproses batch yang status-nya masih AVAILABLE dan expiryDate sudah lewat. Batch yang sudah EXPIRED tidak akan diproses ulang.
+
+**Q: Kenapa "Nilai At-Risk" penting?**
+A: Ini menunjukkan potensi kerugian jika batch yang mendekati expired (7 hari) tidak dipakai. Misalnya Rp 850.000 → artinya Anda bisa kehilangan Rp 850.000 jika batch-batch tersebut tidak terpakai. Gunakan angka ini untuk memprioritaskan produksi.
+
+**Q: Bagaimana hubungan dengan fitur Waste Tracking yang sudah ada?**
+A: Saling melengkapi. Saat Anda "Tandai Expired" sebuah batch → sistem otomatis membuat WasteRecord dengan kategori EXPIRED. Data ini muncul di laporan waste reguler, sehingga Anda bisa melihat total waste karena expired vs sebab lain.
+
+**Q: Bisakah undo "Tandai Expired"?**
+A: Tidak bisa. Sekali ditandai expired, batch berubah menjadi EXPIRED dan waste record sudah tercatat. Pastikan batch memang expired sebelum menandai.
+
+**Q: Bagaimana kalau saya mau membagi 1 batch menjadi 2?**
+A: Saat ini tidak bisa split batch. 1 receiving = 1 batch per item. Jika menerima 2 karton dengan expiry berbeda, catat sebagai 2 item receiving terpisah (dengan qty dan expiry berbeda).
+
+**Q: Alert expiry dikirim ke WhatsApp juga?**
+A: Alert muncul di notification bell (in-app). Integrasi WhatsApp untuk alert expiry menggunakan fitur notifikasi yang sama — jika WhatsApp notification sudah dikonfigurasi, alert expiry juga akan terkirim ke sana.
+
+---
+
 ## Glosarium
 
 | Istilah | Penjelasan |
@@ -1715,6 +2099,12 @@ A: Saat ini belum ada fitur print/PDF khusus untuk jadwal. Anda bisa menggunakan
 | **Kapasitas Harian** | Batas maksimum porsi yang bisa diproduksi per hari berdasarkan kemampuan dapur |
 | **Daftar Belanja** | Konsolidasi kebutuhan bahan dari jadwal mingguan yang dikonversi menjadi Draft PO |
 | **Stock Check** | Pengecekan ketersediaan stok bahan terhadap kebutuhan jadwal produksi |
+| **FIFO** | First In, First Out — prinsip bahwa barang yang pertama masuk harus pertama keluar/dipakai |
+| **Batch** | Satu kelompok barang yang diterima pada waktu yang sama, dengan nomor batch dan tanggal expired |
+| **Expiry Date** | Tanggal kadaluarsa bahan — setelah tanggal ini, bahan tidak boleh dipakai |
+| **At-Risk Value** | Nilai Rupiah dari batch yang mendekati expired, menunjukkan potensi kerugian |
+| **Auto-Expire** | Proses otomatis menandai batch yang sudah melewati tanggal expired sebagai waste |
+| **Perishable** | Bahan yang cepat rusak/busuk dan perlu tracking expiry (daging, sayur, susu) |
 
 ---
 
