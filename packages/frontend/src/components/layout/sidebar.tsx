@@ -7,7 +7,7 @@ import {
   LayoutDashboard, Truck, FileText, PackageCheck, Receipt,
   Package, ArrowLeftRight, ClipboardCheck, ChefHat, CalendarDays,
   Trash2, Calculator, BarChart3, TrendingUp, TrendingDown, Users, Tag, Ruler,
-  ChevronDown, ChevronRight, Menu, Bell, Award,
+  ChevronDown, ChevronRight, Menu, Bell, Award, LineChart, Calendar,
 } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { useAuthStore } from '@/stores/auth-store';
@@ -64,6 +64,7 @@ const navGroups: NavGroup[] = [
       { title: 'Resep', href: '/produksi/resep', icon: ChefHat },
       { title: 'Produksi Harian', href: '/produksi/harian', icon: CalendarDays },
       { title: 'Waste', href: '/produksi/waste', icon: Trash2 },
+      { title: 'Prediksi Bahan', href: '/produksi/forecasting', icon: LineChart },
     ],
   },
   {
@@ -81,6 +82,7 @@ const navGroups: NavGroup[] = [
       { title: 'Pengguna', href: '/pengaturan/user', icon: Users },
       { title: 'Kategori', href: '/pengaturan/kategori', icon: Tag },
       { title: 'Satuan', href: '/pengaturan/satuan', icon: Ruler },
+      { title: 'Faktor Musiman', href: '/pengaturan/musiman', icon: Calendar },
     ],
   },
 ];

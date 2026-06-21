@@ -686,6 +686,20 @@ async function main() {
 
   console.log('✓ 8 audit log entries');
 
+  // ─── 15. SEASONAL FACTORS ──────────────────────────────────
+  const seasonalFactors = [
+    { name: 'Ramadhan 2026', startDate: new Date('2026-02-18'), endDate: new Date('2026-03-19'), multiplier: 1.4, scope: 'GLOBAL', notes: 'Peningkatan produksi selama Ramadhan' },
+    { name: 'Libur Lebaran 2026', startDate: new Date('2026-03-20'), endDate: new Date('2026-03-25'), multiplier: 0.3, scope: 'GLOBAL', notes: 'Penurunan drastis saat libur' },
+    { name: 'Liburan Sekolah Juli', startDate: new Date('2026-07-01'), endDate: new Date('2026-07-15'), multiplier: 1.2, scope: 'GLOBAL', notes: 'Sedikit peningkatan saat liburan sekolah' },
+    { name: 'Promo Steak Spesial', startDate: daysAgo(5), endDate: daysAgo(-10), multiplier: 1.5, scope: 'CATEGORY', categoryId: cats['Makanan Utama'], notes: 'Promo steak weekday' },
+  ];
+
+  for (const sf of seasonalFactors) {
+    await prisma.seasonalFactor.create({ data: sf as any });
+  }
+
+  console.log('✓ 4 seasonal factors');
+
   // ─── SUMMARY ──────────────────────────────────────────────
   console.log('\n✅ Demo seed selesai!\n');
   console.log('Akun login:');
@@ -698,6 +712,7 @@ async function main() {
   console.log('  11 PO (berbagai status), 8 receiving, 3 invoice');
   console.log('  35 produksi (30 hari), 10 waste, 1 opname');
   console.log('  7 notifikasi, 8 audit log, histori harga');
+  console.log('  4 seasonal factors');
 }
 
 main()

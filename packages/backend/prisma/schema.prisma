@@ -43,6 +43,7 @@ model User {
   stockMovements         StockMovement[]
   auditLogs              AuditLog[]
   notifications          Notification[]
+  forecastsCreated       DemandForecast[] @relation("ForecastCreator")
 
   @@map("users")
 }
@@ -54,8 +55,9 @@ model Category {
   description String?      @db.Text
   isActive    Boolean      @default(true) @map("is_active")
 
-  items   Item[]
-  recipes Recipe[]
+  items            Item[]
+  recipes          Recipe[]
+  seasonalFactors  SeasonalFactor[]
 
   @@map("categories")
 }
@@ -139,6 +141,7 @@ model Item {
   productionItems    ProductionItem[]
   wasteRecords       WasteRecord[]
   priceHistory       PriceHistory[]
+  demandForecasts    DemandForecast[]
 
   @@index([categoryId])
   @@index([sku])
@@ -463,4 +466,42 @@ model PriceHistory {
   @@index([supplierId])
   @@index([recordedAt])
   @@map("price_history")
+}
+
+model SeasonalFactor {
+  id          Int      @id @default(autoincrement())
+  name        String   @db.VarChar(200)
+  startDate   DateTime @map("start_date") @db.Date
+  endDate     DateTime @map("end_date") @db.Date
+  multiplier  Decimal  @default(1) @db.Decimal(5, 2)
+  scope       String   @default("GLOBAL") @db.VarChar(20)
+  categoryId  Int?     @map("category_id")
+  isActive    Boolean  @default(true) @map("is_active")
+  notes       String?  @db.Text
+  createdAt   DateTime @default(now()) @map("created_at")
+
+  category Category? @relation(fields: [categoryId], references: [id])
+
+  @@index([startDate, endDate])
+  @@map("seasonal_factors")
+}
+
+model DemandForecast {
+  id           Int      @id @default(autoincrement())
+  itemId       Int      @map("item_id")
+  forecastDate DateTime @map("forecast_date") @db.Date
+  horizonDays  Int      @map("horizon_days")
+  predictedQty Decimal  @map("predicted_qty") @db.Decimal(15, 3)
+  safetyStock  Decimal  @map("safety_stock") @db.Decimal(15, 3)
+  confidence   String   @db.VarChar(20)
+  actualQty    Decimal? @map("actual_qty") @db.Decimal(15, 3)
+  generatedAt  DateTime @default(now()) @map("generated_at")
+  generatedBy  Int      @map("generated_by")
+
+  item    Item @relation(fields: [itemId], references: [id])
+  creator User @relation("ForecastCreator", fields: [generatedBy], references: [id])
+
+  @@index([itemId])
+  @@index([forecastDate])
+  @@map("demand_forecasts")
 }

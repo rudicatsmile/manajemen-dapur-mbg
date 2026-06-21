@@ -20,6 +20,7 @@ import { UnitModule } from './modules/unit/unit.module';
 import { NotificationModule } from './modules/notification/notification.module';
 import { SupplierRatingModule } from './modules/supplier-rating/supplier-rating.module';
 import { PriceHistoryModule } from './modules/price-history/price-history.module';
+import { ForecastingModule } from './modules/forecasting/forecasting.module';
 
 @Module({
   imports: [
@@ -44,6 +45,7 @@ import { PriceHistoryModule } from './modules/price-history/price-history.module
     NotificationModule,
     SupplierRatingModule,
     PriceHistoryModule,
+    ForecastingModule,
   ],
 })
 export class AppModule {}
