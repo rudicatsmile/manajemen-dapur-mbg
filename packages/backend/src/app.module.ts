@@ -21,6 +21,7 @@ import { NotificationModule } from './modules/notification/notification.module';
 import { SupplierRatingModule } from './modules/supplier-rating/supplier-rating.module';
 import { PriceHistoryModule } from './modules/price-history/price-history.module';
 import { ForecastingModule } from './modules/forecasting/forecasting.module';
+import { MealPlanModule } from './modules/meal-plan/meal-plan.module';
 
 @Module({
   imports: [
@@ -46,6 +47,7 @@ import { ForecastingModule } from './modules/forecasting/forecasting.module';
     SupplierRatingModule,
     PriceHistoryModule,
     ForecastingModule,
+    MealPlanModule,
   ],
 })
 export class AppModule {}

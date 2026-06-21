@@ -739,6 +739,101 @@ async function main() {
 
   console.log('✓ 32 demand forecast snapshots (4 minggu × 8 item, dengan aktual)');
 
+  // ─── 17. MEAL PLANS ──────────────────────────────────────────
+  const today = new Date();
+  const dayOfWeek = today.getDay(); // 0=Sun
+  const mondayOffset = dayOfWeek === 0 ? -6 : 1 - dayOfWeek;
+  const thisMonday = new Date(today);
+  thisMonday.setDate(today.getDate() + mondayOffset);
+  thisMonday.setHours(8, 0, 0, 0);
+
+  const mealPlan = await prisma.mealPlan.create({
+    data: {
+      name: `Jadwal Minggu ${thisMonday.getDate()}/${thisMonday.getMonth() + 1}`,
+      weekStartDate: thisMonday,
+      status: 'ACTIVE',
+      maxPortionsPerDay: 200,
+      notes: 'Jadwal produksi minggu ini',
+      createdBy: kitchen.id,
+    },
+  });
+
+  const weeklySchedule = [
+    { day: 1, recipe: 'Nasi Goreng Spesial', portions: 50 },
+    { day: 1, recipe: 'Ayam Geprek', portions: 60 },
+    { day: 1, recipe: 'Es Teh Manis', portions: 80 },
+    { day: 2, recipe: 'Ayam Geprek', portions: 55 },
+    { day: 2, recipe: 'Sop Ayam', portions: 35 },
+    { day: 2, recipe: 'Sambal Matah', portions: 5 },
+    { day: 3, recipe: 'Nasi Goreng Spesial', portions: 45 },
+    { day: 3, recipe: 'Steak Daging Sapi', portions: 15 },
+    { day: 3, recipe: 'Es Teh Manis', portions: 85 },
+    { day: 4, recipe: 'Udang Saus Padang', portions: 20 },
+    { day: 4, recipe: 'Ikan Dori Goreng Tepung', portions: 25 },
+    { day: 4, recipe: 'Nasi Kuning', portions: 40 },
+    { day: 5, recipe: 'Nasi Goreng Spesial', portions: 60 },
+    { day: 5, recipe: 'Ayam Geprek', portions: 70 },
+    { day: 5, recipe: 'Kentang Goreng', portions: 40 },
+    { day: 5, recipe: 'Es Teh Manis', portions: 90 },
+    { day: 6, recipe: 'Steak Daging Sapi', portions: 20 },
+    { day: 6, recipe: 'Udang Saus Padang', portions: 15 },
+    { day: 6, recipe: 'Kentang Goreng', portions: 35 },
+  ];
+
+  let sortOrder = 0;
+  for (const item of weeklySchedule) {
+    const recipeId = recipes[item.recipe];
+    if (!recipeId) continue;
+    await prisma.mealPlanItem.create({
+      data: {
+        mealPlanId: mealPlan.id,
+        recipeId,
+        dayOfWeek: item.day,
+        portions: d(item.portions),
+        sortOrder: sortOrder++,
+      },
+    });
+  }
+
+  const template = await prisma.mealPlanTemplate.create({
+    data: {
+      name: 'Jadwal Standar Weekday',
+      description: 'Template standar untuk hari kerja Senin-Jumat',
+      isDefault: true,
+      createdBy: kitchen.id,
+    },
+  });
+
+  const templateSchedule = [
+    { day: 1, recipe: 'Nasi Goreng Spesial', portions: 50 },
+    { day: 1, recipe: 'Ayam Geprek', portions: 60 },
+    { day: 2, recipe: 'Ayam Geprek', portions: 55 },
+    { day: 2, recipe: 'Sop Ayam', portions: 30 },
+    { day: 3, recipe: 'Nasi Goreng Spesial', portions: 45 },
+    { day: 3, recipe: 'Steak Daging Sapi', portions: 15 },
+    { day: 4, recipe: 'Udang Saus Padang', portions: 20 },
+    { day: 4, recipe: 'Nasi Kuning', portions: 40 },
+    { day: 5, recipe: 'Nasi Goreng Spesial', portions: 55 },
+    { day: 5, recipe: 'Ayam Geprek', portions: 65 },
+  ];
+
+  let tSortOrder = 0;
+  for (const item of templateSchedule) {
+    const recipeId = recipes[item.recipe];
+    if (!recipeId) continue;
+    await prisma.mealPlanTemplateItem.create({
+      data: {
+        templateId: template.id,
+        recipeId,
+        dayOfWeek: item.day,
+        portions: d(item.portions),
+        sortOrder: tSortOrder++,
+      },
+    });
+  }
+
+  console.log('✓ 1 meal plan (active, 19 items) + 1 template (10 items)');
+
   // ─── SUMMARY ──────────────────────────────────────────────
   console.log('\n✅ Demo seed selesai!\n');
   console.log('Akun login:');
@@ -752,6 +847,7 @@ async function main() {
   console.log('  35 produksi (30 hari), 10 waste, 1 opname');
   console.log('  7 notifikasi, 8 audit log, histori harga');
   console.log('  4 seasonal factors, 32 demand forecasts');
+  console.log('  1 meal plan (19 items), 1 template (10 items)');
 }
 
 main()

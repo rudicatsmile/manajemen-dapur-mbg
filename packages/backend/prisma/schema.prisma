@@ -39,6 +39,8 @@ model User {
   stockOpnamesApproved   StockOpname[]     @relation("OpnameApprovedBy")
   recipesCreated         Recipe[]
   productionsCreated     Production[]
+  mealPlansCreated       MealPlan[]           @relation("MealPlanCreator")
+  mealPlanTemplatesCreated MealPlanTemplate[] @relation("MealPlanTemplateCreator")
   wastesCreated          WasteRecord[]
   stockMovements         StockMovement[]
   auditLogs              AuditLog[]
@@ -333,6 +335,8 @@ model Recipe {
 
   items       RecipeItem[]
   productions Production[]
+  mealPlanItems         MealPlanItem[]
+  mealPlanTemplateItems MealPlanTemplateItem[]
 
   @@index([categoryId])
   @@map("recipes")
@@ -504,4 +508,68 @@ model DemandForecast {
   @@index([itemId])
   @@index([forecastDate])
   @@map("demand_forecasts")
+}
+
+model MealPlan {
+  id               Int      @id @default(autoincrement())
+  name             String   @db.VarChar(200)
+  weekStartDate    DateTime @map("week_start_date") @db.Date
+  status           String   @default("DRAFT") @db.VarChar(20)
+  maxPortionsPerDay Int     @default(200) @map("max_portions_per_day")
+  notes            String?  @db.Text
+  createdBy        Int      @map("created_by")
+  createdAt        DateTime @default(now()) @map("created_at")
+  updatedAt        DateTime @updatedAt @map("updated_at")
+
+  creator User       @relation("MealPlanCreator", fields: [createdBy], references: [id])
+  items   MealPlanItem[]
+
+  @@index([weekStartDate])
+  @@index([status])
+  @@map("meal_plans")
+}
+
+model MealPlanItem {
+  id         Int     @id @default(autoincrement())
+  mealPlanId Int     @map("meal_plan_id")
+  recipeId   Int     @map("recipe_id")
+  dayOfWeek  Int     @map("day_of_week")
+  portions   Decimal @db.Decimal(15, 3)
+  sortOrder  Int     @default(0) @map("sort_order")
+  notes      String? @db.Text
+
+  mealPlan MealPlan @relation(fields: [mealPlanId], references: [id], onDelete: Cascade)
+  recipe   Recipe   @relation(fields: [recipeId], references: [id])
+
+  @@index([mealPlanId])
+  @@map("meal_plan_items")
+}
+
+model MealPlanTemplate {
+  id          Int      @id @default(autoincrement())
+  name        String   @db.VarChar(200)
+  description String?  @db.Text
+  isDefault   Boolean  @default(false) @map("is_default")
+  createdBy   Int      @map("created_by")
+  createdAt   DateTime @default(now()) @map("created_at")
+
+  creator User                   @relation("MealPlanTemplateCreator", fields: [createdBy], references: [id])
+  items   MealPlanTemplateItem[]
+
+  @@map("meal_plan_templates")
+}
+
+model MealPlanTemplateItem {
+  id         Int     @id @default(autoincrement())
+  templateId Int     @map("template_id")
+  recipeId   Int     @map("recipe_id")
+  dayOfWeek  Int     @map("day_of_week")
+  portions   Decimal @db.Decimal(15, 3)
+  sortOrder  Int     @default(0) @map("sort_order")
+
+  template MealPlanTemplate @relation(fields: [templateId], references: [id], onDelete: Cascade)
+  recipe   Recipe           @relation(fields: [recipeId], references: [id])
+
+  @@index([templateId])
+  @@map("meal_plan_template_items")
 }
