@@ -1,7 +1,7 @@
 # Manual Book — Manajemen Dapur MBG
 
-**Versi**: 1.1
-**Terakhir Diperbarui**: 20 Juni 2026
+**Versi**: 1.2
+**Terakhir Diperbarui**: 21 Juni 2026
 
 ---
 
@@ -44,6 +44,17 @@
    - 4.5 [Alert Harga Otomatis](#45-alert-harga-otomatis)
    - 4.6 [Strategi Berdasarkan Data Harga](#46-strategi-berdasarkan-data-harga)
    - 4.7 [FAQ Histori Harga](#47-faq-histori-harga)
+5. [Forecasting Kebutuhan Bahan Baku](#5-forecasting-kebutuhan-bahan-baku)
+   - 5.1 [Tentang Forecasting](#51-tentang-forecasting)
+   - 5.2 [Cara Kerja Algoritma Prediksi](#52-cara-kerja-algoritma-prediksi)
+   - 5.3 [Dashboard Prediksi Kebutuhan](#53-dashboard-prediksi-kebutuhan)
+   - 5.4 [Detail Prediksi Per Item](#54-detail-prediksi-per-item)
+   - 5.5 [Auto-Generate Draft PO](#55-auto-generate-draft-po)
+   - 5.6 [Faktor Musiman (Seasonal Factors)](#56-faktor-musiman-seasonal-factors)
+   - 5.7 [Akurasi Prediksi](#57-akurasi-prediksi)
+   - 5.8 [Memahami Safety Stock](#58-memahami-safety-stock)
+   - 5.9 [Tips & Best Practices](#59-tips--best-practices)
+   - 5.10 [FAQ Forecasting](#510-faq-forecasting)
 
 ---
 
@@ -885,6 +896,390 @@ A: Alert muncul saat **receiving** (terima barang), bukan saat buat PO. Jadi And
 
 ---
 
+## 5. Forecasting Kebutuhan Bahan Baku
+
+### 5.1 Tentang Forecasting
+
+Forecasting adalah fitur yang **memprediksi kebutuhan bahan baku** untuk beberapa hari ke depan berdasarkan pola produksi historis. Sistem menganalisis data produksi 60 hari terakhir, mengenali pola per hari dalam seminggu, dan memperhitungkan event musiman (Ramadhan, liburan, promo) untuk menghasilkan prediksi akurat.
+
+**Manfaat utama:**
+- Tahu persis berapa banyak bahan yang dibutuhkan minggu depan
+- Tidak kehabisan stok (stockout) — sistem menghitung safety stock
+- Tidak over-stock — beli sesuai kebutuhan aktual
+- **Auto-generate Draft PO** langsung dari hasil prediksi — hemat waktu purchaser
+- Lacak akurasi prediksi vs aktual — sistem makin akurat seiring waktu
+
+**Siapa yang menggunakan:**
+- **Owner/Admin** — melihat prediksi, menyetujui PO yang di-generate
+- **Purchaser** — menggunakan prediksi untuk perencanaan pembelian, generate draft PO
+- **Kitchen Manager** — melihat prediksi untuk perencanaan produksi
+
+### 5.2 Cara Kerja Algoritma Prediksi
+
+Sistem menggunakan pendekatan **statistik terapan** (bukan AI/ML) agar transparan dan mudah dipahami:
+
+```
+Langkah 1: Kumpulkan Data
+   ↓ Ambil semua data produksi 60 hari terakhir
+   ↓ Hitung konsumsi bahan per hari
+
+Langkah 2: Pola Hari (Day-of-Week)
+   ↓ Kelompokkan per hari (Senin-Minggu)
+   ↓ Hitung rata-rata konsumsi per hari
+   ↓ Contoh: Jumat selalu lebih ramai → prediksi Jumat lebih tinggi
+
+Langkah 3: Faktor Musiman
+   ↓ Cek apakah ada event aktif di tanggal prediksi
+   ↓ Ramadhan: kalikan 1.4× (naik 40%)
+   ↓ Libur Lebaran: kalikan 0.3× (turun 70%)
+
+Langkah 4: Safety Stock
+   ↓ Hitung variabilitas konsumsi (standar deviasi)
+   ↓ Safety stock = 1.65 × σ × √(3 hari lead time)
+   ↓ Buffer cadangan untuk antisipasi lonjakan tak terduga
+
+Langkah 5: Hitung Kekurangan
+   ↓ Total dibutuhkan = Prediksi demand + Safety stock
+   ↓ Kekurangan = max(0, Total dibutuhkan - Stok saat ini)
+```
+
+**Contoh perhitungan:**
+- Ayam Fillet, prediksi 7 hari ke depan = 15 kg
+- Safety stock = 4.5 kg (karena konsumsi cukup fluktuatif)
+- Total dibutuhkan = 15 + 4.5 = **19.5 kg**
+- Stok saat ini = 8 kg
+- **Kekurangan = 19.5 − 8 = 11.5 kg** → perlu beli 11.5 kg
+
+### 5.3 Dashboard Prediksi Kebutuhan
+
+**Cara mengakses:**
+1. Login ke aplikasi
+2. Di sidebar kiri, klik **Produksi**
+3. Klik **Prediksi Bahan**
+
+**Tampilan halaman:**
+
+```
+┌──────────────────────────────────────────────────────────────┐
+│  Prediksi Kebutuhan Bahan                                    │
+│  Prediksi kebutuhan bahan berdasarkan data historis          │
+│                                                              │
+│  Horizon: [7 Hari ▼]              [🛒 Generate Draft PO]    │
+│                                                              │
+│  ┌──────────┐ ┌──────────┐ ┌──────────┐ ┌──────────┐       │
+│  │ Total    │ │ Perlu    │ │Confidence│ │ Musiman  │       │
+│  │ Item     │ │ Restock  │ │          │ │ Aktif    │       │
+│  │   18     │ │    6     │ │ T:8 S:7  │ │    2     │       │
+│  └──────────┘ └──────────┘ │ R:3     │ └──────────┘       │
+│                             └──────────┘                     │
+│  ┌──────────────────────────────────────────────────────┐   │
+│  │ Item          Stok   Prediksi Safety  Total  Kurang  │   │
+│  ├──────────────────────────────────────────────────────┤   │
+│  │ Ayam Fillet    8kg    15kg    4.5kg  19.5kg  11.5kg  │ ← merah
+│  │ Bawang Merah   3kg    8kg     2.1kg  10.1kg   7.1kg  │ ← merah
+│  │ Cabai Keriting 2kg    5kg     1.8kg   6.8kg   4.8kg  │ ← merah
+│  │ Beras Premium 60kg   30kg    5.2kg  35.2kg   Cukup  │ ← normal
+│  │ Minyak Goreng 20kg   12kg    3.0kg  15.0kg   Cukup  │ ← normal
+│  └──────────────────────────────────────────────────────┘   │
+└──────────────────────────────────────────────────────────────┘
+```
+
+**Penjelasan kolom tabel:**
+
+| Kolom | Penjelasan |
+|-------|-----------|
+| **Item** | Nama bahan + SKU |
+| **Kategori** | Kategori bahan (Protein, Bumbu, dll) |
+| **Stok Saat Ini** | Jumlah stok yang tersedia di gudang |
+| **Prediksi N Hari** | Perkiraan total konsumsi dalam N hari ke depan |
+| **Safety Stock** | Buffer cadangan untuk antisipasi fluktuasi |
+| **Total Dibutuhkan** | Prediksi + Safety Stock |
+| **Kekurangan** | Selisih antara total dibutuhkan dan stok saat ini. Merah jika > 0, "Cukup" (hijau) jika stok mencukupi |
+| **Confidence** | Tingkat keyakinan prediksi: **Tinggi** (hijau), **Sedang** (kuning), **Rendah** (merah) |
+| **Musiman** | Faktor musiman yang aktif (mis. "Promo Steak", "Ramadhan") |
+
+**Pengaturan horizon:**
+- **7 Hari** — Untuk pembelian mingguan rutin
+- **14 Hari** — Untuk perencanaan 2 minggu ke depan
+- **30 Hari** — Untuk perencanaan bulanan / stok besar
+
+### 5.4 Detail Prediksi Per Item
+
+Klik tombol **Detail** (ikon mata) pada baris item di tabel untuk melihat analisis mendalam:
+
+**A. Kartu Statistik (5 kartu)**
+
+```
+┌──────────┐ ┌──────────┐ ┌──────────┐ ┌──────────┐ ┌──────────┐
+│ Rata-rata│ │ Std Dev  │ │Variabili-│ │ Safety   │ │Confidence│
+│ Harian   │ │          │ │  tas     │ │ Stock    │ │          │
+│ 2.14 kg  │ │ 0.85 kg  │ │  39.7%   │ │ 2.43 kg  │ │ SEDANG   │
+└──────────┘ └──────────┘ └──────────┘ └──────────┘ └──────────┘
+```
+
+| Kartu | Penjelasan |
+|-------|-----------|
+| **Rata-rata Harian** | Konsumsi rata-rata bahan ini per hari (dari 60 hari data) |
+| **Standar Deviasi** | Seberapa besar variasi konsumsi dari rata-rata. Semakin kecil = semakin stabil |
+| **Variabilitas** | Coefficient of Variation (CV) = σ/μ × 100%. Semakin rendah = semakin predictable |
+| **Safety Stock** | Buffer cadangan yang dihitung sistem. Makin fluktuatif → safety stock makin besar |
+| **Confidence** | Level keyakinan prediksi berdasarkan jumlah data dan variabilitas |
+
+**B. Grafik Prediksi Harian (Bar Chart)**
+
+```
+  Prediksi (kg)
+  3.5 ┤      ██
+  3.0 ┤  ██  ██     ██
+  2.5 ┤  ██  ██  ██ ██  ██
+  2.0 ┤  ██  ██  ██ ██  ██  ██
+  1.5 ┤  ██  ██  ██ ██  ██  ██  ▓▓  ← oranye = ada faktor musiman
+  1.0 ┤  ██  ██  ██ ██  ██  ██  ▓▓
+      └──────────────────────────────
+       Sen  Sel  Rab  Kam  Jum  Sab  Min
+```
+
+- **Biru** (default): prediksi normal
+- **Oranye**: ada faktor musiman aktif (multiplier > 1)
+- **Biru muda**: ada faktor musiman penurunan (multiplier < 1)
+- Hover pada bar → lihat detail: tanggal, hari, prediksi qty, multiplier musiman
+
+**C. Pola Hari dalam Seminggu (Bar Chart)**
+
+Menampilkan rata-rata konsumsi per hari. Berguna untuk memahami pola:
+- Hari apa yang paling ramai? (bar tertinggi, di-highlight)
+- Hari apa yang paling sepi?
+- Apakah ada pola weekend vs weekday?
+
+**D. Histori Konsumsi (Area Chart)**
+
+Grafik area menampilkan konsumsi aktual 30 hari terakhir. Gunakan untuk:
+- Melihat apakah ada tren naik/turun
+- Mengidentifikasi outlier (hari yang konsumsinya sangat tinggi/rendah)
+- Membandingkan visual pola dengan prediksi
+
+### 5.5 Auto-Generate Draft PO
+
+Fitur ini membuat Draft Purchase Order otomatis berdasarkan hasil prediksi kekurangan stok.
+
+**Cara menggunakan:**
+
+1. Di halaman Prediksi Kebutuhan, pastikan horizon sesuai (7/14/30 hari)
+2. Review tabel — lihat item mana yang kekurangan stok (kolom "Kekurangan" merah)
+3. Klik tombol **"Generate Draft PO"** (ikon keranjang belanja)
+4. Muncul dialog konfirmasi:
+   ```
+   ┌─────────────────────────────────────────────┐
+   │  Generate Draft PO                           │
+   │                                              │
+   │  Ini akan membuat Draft PO untuk semua item  │
+   │  yang kekurangan stok berdasarkan prediksi   │
+   │  7 hari ke depan. Lanjutkan?                 │
+   │                                              │
+   │              [Batal]  [Ya, Generate]          │
+   └─────────────────────────────────────────────┘
+   ```
+5. Klik **"Ya, Generate"**
+6. Sistem akan:
+   - Menghitung qty yang perlu dibeli per item (= kekurangan)
+   - Menentukan supplier terbaik per item (dari histori harga — termurah/terbaru)
+   - Mengelompokkan item per supplier
+   - Membuat 1 Draft PO per supplier
+7. Muncul notifikasi sukses: "3 Draft PO berhasil dibuat"
+8. Buka menu **Pembelian → Purchase Order** untuk mereview dan approve PO yang dibuat
+
+**Yang terjadi di balik layar:**
+
+```
+Prediksi: 6 item kekurangan stok
+  ↓
+Tentukan supplier per item (dari PriceHistory):
+  - Ayam Fillet → PT Sumber Makmur (termurah)
+  - Udang Kupas → PT Sumber Makmur
+  - Bawang Merah → UD Rempah Nusantara
+  - Cabai Merah → UD Rempah Nusantara
+  - Kentang → CV Bahan Segar
+  - Wortel → CV Bahan Segar
+  ↓
+Group per supplier → 3 Draft PO:
+  - PO-20260621-012: PT Sumber Makmur (Ayam + Udang)
+  - PO-20260621-013: UD Rempah Nusantara (Bawang + Cabai)
+  - PO-20260621-014: CV Bahan Segar (Kentang + Wortel)
+```
+
+**Penting:**
+- PO dibuat dengan status **DRAFT** — Anda masih bisa edit qty/harga sebelum submit
+- Harga per item menggunakan `lastPrice` dari data terakhir
+- Sistem juga menyimpan snapshot prediksi di database untuk tracking akurasi nanti
+
+### 5.6 Faktor Musiman (Seasonal Factors)
+
+Faktor musiman memungkinkan Anda mengonfigurasi event yang memengaruhi volume produksi, sehingga prediksi lebih akurat.
+
+**Cara mengakses:**
+1. Di sidebar, klik **Pengaturan**
+2. Klik **Faktor Musiman**
+
+**Halaman faktor musiman:**
+
+```
+┌──────────────────────────────────────────────────────────────┐
+│  Faktor Musiman                         [+ Tambah Faktor]    │
+│                                                              │
+│  ┌──────────────────────────────────────────────────────┐   │
+│  │ Nama                Periode           Multiplier  Scope│  │
+│  ├──────────────────────────────────────────────────────┤   │
+│  │ Ramadhan 2026      18 Feb - 19 Mar    +40%     Global│  │
+│  │ Libur Lebaran      20 Mar - 25 Mar    -70%     Global│  │
+│  │ Liburan Sekolah    1 Jul - 15 Jul     +20%     Global│  │
+│  │ Promo Steak        16 Jun - 1 Jul     +50%   Kategori│  │
+│  └──────────────────────────────────────────────────────┘   │
+└──────────────────────────────────────────────────────────────┘
+```
+
+**Membuat faktor musiman baru:**
+
+1. Klik **"Tambah Faktor"**
+2. Isi form:
+   - **Nama**: Nama event (mis. "Ramadhan 2026", "Promo Akhir Tahun")
+   - **Tanggal Mulai**: Kapan event dimulai
+   - **Tanggal Selesai**: Kapan event berakhir
+   - **Multiplier**: Angka pengali produksi
+     - `1.0` = normal (tidak ada perubahan)
+     - `1.5` = naik 50%
+     - `0.5` = turun 50%
+     - `1.2` = naik 20%
+     - `0.3` = turun 70%
+   - **Scope**: 
+     - **Global** = berlaku untuk semua bahan
+     - **Per Kategori** = hanya berlaku untuk kategori resep tertentu
+   - **Kategori** (jika scope = Per Kategori): pilih kategori resep
+   - **Catatan**: penjelasan opsional
+
+**Contoh faktor musiman yang umum:**
+
+| Event | Multiplier | Penjelasan |
+|-------|-----------|-----------|
+| Ramadhan | 1.3 – 1.5 | Peningkatan menu buka puasa |
+| Libur Lebaran | 0.2 – 0.4 | Tutup/minimal operasi |
+| Natal & Tahun Baru | 1.2 – 1.4 | Peningkatan pesanan |
+| Liburan Sekolah | 1.1 – 1.2 | Sedikit peningkatan |
+| Weekend Promo | 1.3 – 1.5 | Promo khusus weekend |
+| Catering Event | 1.5 – 2.0 | Pesanan catering besar |
+| Musim Hujan | 0.8 – 0.9 | Pengunjung sedikit berkurang |
+
+### 5.7 Akurasi Prediksi
+
+Halaman akurasi menunjukkan seberapa tepat prediksi sistem dibandingkan konsumsi aktual.
+
+**Cara mengakses:**
+1. Di halaman Prediksi Kebutuhan, klik link **"Akurasi"** atau
+2. Akses langsung: `/produksi/forecasting/akurasi`
+
+**Metrik yang ditampilkan:**
+
+| Metrik | Penjelasan | Target |
+|--------|-----------|--------|
+| **Akurasi Keseluruhan** | 100% − MAPE. Semakin tinggi semakin baik | > 85% |
+| **MAPE** | Mean Absolute Percentage Error — rata-rata error prediksi | < 15% |
+| **Total Prediksi** | Jumlah forecast record yang sudah direkonsiliasi | — |
+
+**Interpretasi akurasi per item:**
+
+| Akurasi | Status | Warna | Arti |
+|---------|--------|-------|------|
+| > 85% | Akurat | Hijau | Prediksi sangat baik, bisa diandalkan |
+| 70-85% | Cukup | Kuning | Prediksi cukup, masih bisa dipakai dengan safety stock |
+| < 70% | Perlu Perbaikan | Merah | Prediksi kurang akurat, review pola konsumsi item ini |
+
+**Tombol "Rekonsiliasi":**
+- Klik untuk memperbarui data aktual pada prediksi yang sudah lewat
+- Sistem membandingkan prediksi yang disimpan saat generate PO dengan konsumsi aktual dari data produksi
+- Lakukan rekonsiliasi minimal 1x per minggu untuk data akurasi yang up-to-date
+
+### 5.8 Memahami Safety Stock
+
+Safety stock adalah **buffer cadangan** yang dihitung sistem untuk mengantisipasi variasi konsumsi yang tidak terduga.
+
+**Rumus:**
+```
+Safety Stock = Z × σ × √(Lead Time)
+
+Dimana:
+  Z = 1.65 (target service level 95% — artinya 95% kemungkinan stok mencukupi)
+  σ = Standar deviasi konsumsi harian
+  Lead Time = 3 hari (waktu dari order ke barang diterima)
+```
+
+**Contoh:**
+- Ayam Fillet: σ = 1.5 kg/hari
+- Safety Stock = 1.65 × 1.5 × √3 = **4.29 kg**
+- Artinya: simpan cadangan 4.29 kg di atas prediksi untuk 95% jaminan tidak kehabisan
+
+**Faktor yang memengaruhi safety stock:**
+- **Semakin fluktuatif konsumsi** → safety stock semakin besar
+- **Semakin lama lead time** → safety stock semakin besar
+- Item stabil (seperti beras) → safety stock kecil
+- Item fluktuatif (seperti cabai) → safety stock besar
+
+### 5.9 Tips & Best Practices
+
+1. **Mulai dengan horizon 7 hari** — Prediksi jangka pendek lebih akurat. Gunakan 14-30 hari hanya untuk perencanaan makro.
+
+2. **Butuh minimal 2 minggu data produksi** — Prediksi baru bermakna setelah ada cukup data historis. Semakin banyak data (30-60 hari), semakin akurat.
+
+3. **Selalu input produksi harian** — Jika ada hari yang tidak dicatat produksinya, prediksi untuk hari itu akan kurang akurat karena sistem menganggap tidak ada konsumsi.
+
+4. **Setup faktor musiman sebelum event dimulai** — Masukkan Ramadhan, Natal, promo, dll minimal 1 minggu sebelumnya agar prediksi sudah memperhitungkan.
+
+5. **Review Draft PO sebelum approve** — Auto-generate PO adalah rekomendasi, bukan keputusan final. Selalu review qty dan harga sebelum approve.
+
+6. **Lakukan rekonsiliasi mingguan** — Klik "Rekonsiliasi" di halaman akurasi setiap minggu untuk update data aktual. Ini membantu memonitor apakah prediksi masih akurat.
+
+7. **Perhatikan confidence level** — Item dengan confidence "RENDAH" mungkin perlu penyesuaian manual. Cek detailnya untuk memahami kenapa.
+
+8. **Bandingkan beberapa horizon** — Cek 7 hari dan 14 hari. Jika hasilnya sangat berbeda, ada variabilitas tinggi yang perlu dicermati.
+
+9. **Gunakan bersama Menu Engineering** — Jika Menu Engineering menunjukkan menu "Dog" (tidak laku), bahan eksklusif menu tersebut bisa diabaikan dalam forecast untuk mengurangi waste.
+
+10. **Sistem makin pintar seiring waktu** — Semakin banyak data produksi terkumpul, pola day-of-week semakin akurat, dan confidence meningkat.
+
+### 5.10 FAQ Forecasting
+
+**Q: Kenapa halaman prediksi kosong (tidak ada item)?**
+A: Belum ada data produksi yang tercatat di sistem. Prediksi membutuhkan minimal beberapa catatan produksi harian agar bisa menghitung pola konsumsi bahan.
+
+**Q: Apa bedanya "Prediksi" dan "Total Dibutuhkan"?**
+A: "Prediksi" adalah perkiraan konsumsi murni. "Total Dibutuhkan" = Prediksi + Safety Stock. Selalu gunakan "Total Dibutuhkan" untuk menentukan jumlah pembelian karena sudah termasuk buffer keamanan.
+
+**Q: Kenapa confidence saya "RENDAH"?**
+A: Dua kemungkinan:
+1. **Data kurang** — Belum ada cukup data produksi (butuh minimal 15 hari). Terus catat produksi harian, confidence akan meningkat.
+2. **Konsumsi sangat fluktuatif** — Variasi konsumsi terlalu tinggi (CV > 100%). Item ini mungkin memang tidak predictable (dipakai hanya untuk event tertentu).
+
+**Q: Auto-generate PO memilih supplier berdasarkan apa?**
+A: Sistem mencari supplier terakhir yang menyuplai item tersebut dari data histori harga (PriceHistory). Jika ada beberapa supplier, dipilih yang harganya paling murah. Jika tidak ada histori, item dilewati.
+
+**Q: Faktor musiman bertumpuk (ada 2 event di tanggal yang sama), bagaimana?**
+A: Multiplier dikalikan berurutan. Jika ada "Ramadhan (1.4×)" dan "Promo Steak (1.5×)" di tanggal yang sama, prediksi = base × 1.4 × 1.5 = base × 2.1 (naik 110%).
+
+**Q: Apakah forecast otomatis jalan setiap hari?**
+A: Tidak, forecast dihitung **on-demand** saat Anda membuka halaman atau klik Generate PO. Tidak ada job otomatis yang berjalan di background. Ini membuat Anda selalu melihat prediksi paling up-to-date.
+
+**Q: Bagaimana lead time 3 hari ditentukan?**
+A: 3 hari adalah default berdasarkan asumsi umum waktu dari order ke barang diterima. Saat ini belum bisa dikonfigurasi per item — akan tersedia di update berikutnya.
+
+**Q: Kenapa prediksi hari Minggu selalu rendah/nol?**
+A: Karena data produksi historis Anda menunjukkan tidak ada atau sedikit produksi di hari Minggu. Sistem belajar dari pola aktual Anda — jika dapur tutup Minggu, prediksi Minggu memang 0.
+
+**Q: Bisakah saya mengedit prediksi secara manual?**
+A: Tidak, prediksi dihitung otomatis. Tapi Anda bisa mengedit Draft PO yang dihasilkan — ubah qty, hapus item, atau tambah item secara manual sebelum approve.
+
+**Q: Berapa persen akurasi yang normal?**
+A: Untuk industri F&B dengan pola harian yang konsisten, akurasi 80-90% (MAPE 10-20%) dianggap sangat baik. Akurasi 70-80% masih cukup baik. Di bawah 70%, perlu evaluasi — mungkin ada event yang belum dimasukkan sebagai faktor musiman.
+
+---
+
 ## Glosarium
 
 | Istilah | Penjelasan |
@@ -902,6 +1297,15 @@ A: Alert muncul saat **receiving** (terima barang), bukan saat buat PO. Jadi And
 | **Trend** | Arah perubahan performa (naik/turun/stabil) dibandingkan periode sebelumnya |
 | **Price History** | Catatan historis harga beli setiap item dari setiap receiving, digunakan untuk analisis trend |
 | **Harga Pasar** | Rata-rata harga item dari semua supplier, digunakan sebagai pembanding harga individual supplier |
+| **Forecasting** | Prediksi kebutuhan bahan baku di masa depan berdasarkan pola historis |
+| **Safety Stock** | Buffer cadangan stok yang dihitung untuk mengantisipasi variasi konsumsi tak terduga |
+| **MAPE** | Mean Absolute Percentage Error — metrik rata-rata error prediksi dalam persen |
+| **Standar Deviasi (σ)** | Ukuran seberapa besar variasi data dari rata-rata. Semakin besar = semakin fluktuatif |
+| **Coefficient of Variation (CV)** | Rasio standar deviasi terhadap rata-rata (σ/μ). Semakin kecil = semakin stabil dan predictable |
+| **Lead Time** | Waktu yang dibutuhkan dari pemesanan hingga barang diterima (default 3 hari) |
+| **Seasonal Factor** | Faktor pengali untuk menyesuaikan prediksi pada event tertentu (Ramadhan, promo, dll) |
+| **Horizon** | Jangka waktu prediksi ke depan (7/14/30 hari) |
+| **Rekonsiliasi** | Proses mencocokkan prediksi yang sudah lewat dengan konsumsi aktual untuk menghitung akurasi |
 
 ---
 

@@ -700,6 +700,45 @@ async function main() {
 
   console.log('✓ 4 seasonal factors');
 
+  // ─── 16. DEMAND FORECASTS (snapshot historis untuk akurasi) ─
+  const forecastItems = [
+    { name: 'Ayam Fillet', itemKey: 'Ayam Fillet' },
+    { name: 'Beras Premium', itemKey: 'Beras Premium' },
+    { name: 'Minyak Goreng', itemKey: 'Minyak Goreng' },
+    { name: 'Bawang Merah', itemKey: 'Bawang Merah' },
+    { name: 'Telur Ayam', itemKey: 'Telur Ayam' },
+    { name: 'Kentang', itemKey: 'Kentang' },
+    { name: 'Cabai Merah Keriting', itemKey: 'Cabai Merah Keriting' },
+    { name: 'Bawang Putih', itemKey: 'Bawang Putih' },
+  ];
+
+  for (const fi of forecastItems) {
+    const itemId = items[fi.itemKey];
+    if (!itemId) continue;
+
+    for (let week = 4; week >= 1; week--) {
+      const forecastDate = daysAgo(week * 7);
+      const predicted = 5 + Math.random() * 15;
+      const actual = predicted * (0.75 + Math.random() * 0.5);
+
+      await prisma.demandForecast.create({
+        data: {
+          itemId,
+          forecastDate,
+          horizonDays: 7,
+          predictedQty: d(Math.round(predicted * 100) / 100),
+          safetyStock: d(Math.round((predicted * 0.3) * 100) / 100),
+          confidence: week >= 3 ? 'SEDANG' : 'TINGGI',
+          actualQty: d(Math.round(actual * 100) / 100),
+          generatedBy: admin.id,
+          generatedAt: daysAgo(week * 7 + 1),
+        },
+      });
+    }
+  }
+
+  console.log('✓ 32 demand forecast snapshots (4 minggu × 8 item, dengan aktual)');
+
   // ─── SUMMARY ──────────────────────────────────────────────
   console.log('\n✅ Demo seed selesai!\n');
   console.log('Akun login:');
@@ -712,7 +751,7 @@ async function main() {
   console.log('  11 PO (berbagai status), 8 receiving, 3 invoice');
   console.log('  35 produksi (30 hari), 10 waste, 1 opname');
   console.log('  7 notifikasi, 8 audit log, histori harga');
-  console.log('  4 seasonal factors');
+  console.log('  4 seasonal factors, 32 demand forecasts');
 }
 
 main()
