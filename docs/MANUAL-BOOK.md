@@ -1,6 +1,6 @@
 # Manual Book — Manajemen Dapur MBG
 
-**Versi**: 1.2
+**Versi**: 1.3
 **Terakhir Diperbarui**: 21 Juni 2026
 
 ---
@@ -55,6 +55,22 @@
    - 5.8 [Memahami Safety Stock](#58-memahami-safety-stock)
    - 5.9 [Tips & Best Practices](#59-tips--best-practices)
    - 5.10 [FAQ Forecasting](#510-faq-forecasting)
+6. [Meal Prep Planner](#6-meal-prep-planner)
+   - 6.1 [Tentang Meal Prep Planner](#61-tentang-meal-prep-planner)
+   - 6.2 [Cara Mengakses](#62-cara-mengakses)
+   - 6.3 [Membuat Jadwal Baru](#63-membuat-jadwal-baru)
+   - 6.4 [Weekly Board — Tampilan Mingguan](#64-weekly-board--tampilan-mingguan)
+   - 6.5 [Menambah Menu ke Hari](#65-menambah-menu-ke-hari)
+   - 6.6 [Mengedit dan Menghapus Menu](#66-mengedit-dan-menghapus-menu)
+   - 6.7 [Kapasitas Produksi Harian](#67-kapasitas-produksi-harian)
+   - 6.8 [Status Jadwal (DRAFT → ACTIVE → COMPLETED)](#68-status-jadwal)
+   - 6.9 [Cek Ketersediaan Stok](#69-cek-ketersediaan-stok)
+   - 6.10 [Buat Daftar Belanja (Auto-Generate PO)](#610-buat-daftar-belanja)
+   - 6.11 [Template Jadwal](#611-template-jadwal)
+   - 6.12 [Saran Jadwal dari Data Historis](#612-saran-jadwal-dari-data-historis)
+   - 6.13 [Alur Kerja Lengkap](#613-alur-kerja-lengkap)
+   - 6.14 [Tips & Best Practices](#614-tips--best-practices)
+   - 6.15 [FAQ Meal Prep Planner](#615-faq-meal-prep-planner)
 
 ---
 
@@ -1280,6 +1296,394 @@ A: Untuk industri F&B dengan pola harian yang konsisten, akurasi 80-90% (MAPE 10
 
 ---
 
+## 6. Meal Prep Planner
+
+### 6.1 Tentang Meal Prep Planner
+
+Meal Prep Planner adalah fitur **perencanaan produksi mingguan** yang memungkinkan Anda menjadwalkan menu apa akan diproduksi di hari apa, berapa porsi, lalu otomatis menghitung kebutuhan bahan dan membuat daftar belanja.
+
+**Analogi sederhana:**
+Bayangkan papan whiteboard di dapur yang berisi jadwal masak minggu ini. Meal Prep Planner adalah versi digitalnya — dengan bonus otomatis menghitung apakah stok bahan cukup dan membuat PO belanja jika kurang.
+
+**Manfaat utama:**
+- **Produksi terencana** — tahu apa yang harus dimasak setiap hari, tidak ada kebingungan pagi hari
+- **Belanja terkonsolidasi** — total kebutuhan bahan dari seluruh minggu dihitung sekaligus, beli 1x bukan harian
+- **Cek stok otomatis** — langsung tahu bahan apa yang kurang sebelum mulai produksi
+- **Template reusable** — jadwal minggu ini bisa disimpan dan dipakai lagi minggu depan
+- **Saran cerdas** — sistem merekomendasikan jadwal berdasarkan pola produksi historis
+
+### 6.2 Cara Mengakses
+
+1. Login ke aplikasi
+2. Di sidebar kiri, klik **Produksi**
+3. Klik **Meal Prep**
+
+**Hak akses:** Semua role (Owner, Admin, Purchaser, Kitchen Manager) dapat mengakses fitur ini.
+
+**Halaman terkait:**
+- `/produksi/meal-plan` — Halaman utama (planning board)
+- `/pengaturan/meal-plan-template` — Manajemen template (di Pengaturan → Template Meal Plan)
+
+### 6.3 Membuat Jadwal Baru
+
+Jika belum ada jadwal untuk minggu yang dipilih:
+
+1. Navigasi ke minggu yang diinginkan menggunakan tombol `<` (sebelumnya) atau `>` (berikutnya)
+2. Halaman akan menampilkan pesan "Belum ada jadwal untuk minggu ini"
+3. Klik **"Buat Jadwal Baru"**
+4. Isi form:
+   - **Nama Jadwal**: mis. "Jadwal Minggu 22-28 Jun"
+   - **Kapasitas Maksimum per Hari**: batas porsi per hari (default 200)
+5. Klik **Simpan**
+6. Jadwal baru dibuat dengan status **DRAFT** — siap diisi menu
+
+**Alternatif:** Klik **"Terapkan Template"** untuk membuat jadwal dari template yang sudah tersimpan.
+
+### 6.4 Weekly Board — Tampilan Mingguan
+
+Tampilan utama adalah **papan 7 kolom** mewakili Senin sampai Minggu:
+
+```
+┌──────────┬──────────┬──────────┬──────────┬──────────┬──────────┬──────────┐
+│  SENIN   │  SELASA  │  RABU    │  KAMIS   │  JUMAT   │  SABTU   │  MINGGU  │
+│  22 Jun  │  23 Jun  │  24 Jun  │  25 Jun  │  26 Jun  │  27 Jun  │  28 Jun  │
+├──────────┼──────────┼──────────┼──────────┼──────────┼──────────┼──────────┤
+│┌────────┐│┌────────┐│┌────────┐│┌────────┐│┌────────┐│┌────────┐│          │
+││🍳 Nasi ││ │🍗 Ayam ││ │🍳 Nasi ││ │🦐 Udang││ │🍳 Nasi ││ │🥩 Steak││          │
+││ Goreng  ││ │ Geprek ││ │ Kuning ││ │ Padang ││ │ Goreng ││ │ Sapi  ││          │
+││ 50 porsi││ │55 porsi││ │40 porsi││ │20 porsi││ │60 porsi││ │20 porsi││          │
+││Rp 9.500 ││ │Rp 8.200││ │Rp 6.100││ │Rp12.750││ │Rp 9.500││ │Rp27.000││          │
+│└────────┘│└────────┘│└────────┘│└────────┘│└────────┘│└────────┘│          │
+│┌────────┐│┌────────┐│┌────────┐│┌────────┐│┌────────┐│┌────────┐│          │
+││🍗 Ayam ││ │🍲 Sop  ││ │🥩 Steak││ │🐟 Dori ││ │🍗 Ayam ││ │🦐 Udang││          │
+││ Geprek  ││ │ Ayam   ││ │ Sapi  ││ │Gor.Tpg ││ │ Geprek ││ │ Padang ││          │
+││ 60 porsi││ │35 porsi││ │15 porsi││ │25 porsi││ │70 porsi││ │15 porsi││          │
+│└────────┘│└────────┘│└────────┘│└────────┘│└────────┘│└────────┘│          │
+│          │          │┌────────┐│┌────────┐│┌────────┐│┌────────┐│          │
+│          │          ││ 🧊 Es  ││ │🍟 Nasi ││ │🍟 Kntg ││ │🍟 Kntg ││          │
+│          │          ││Teh     ││ │ Kuning ││ │ Goreng ││ │ Goreng ││          │
+│          │          ││85 porsi││ │40 porsi││ │40 porsi││ │35 porsi││          │
+│          │          │└────────┘│└────────┘│└────────┘│└────────┘│          │
+│          │          │          │          │          │          │          │
+│[+ Tambah]│[+ Tambah]│[+ Tambah]│[+ Tambah]│[+ Tambah]│[+ Tambah]│[+ Tambah]│
+├──────────┼──────────┼──────────┼──────────┼──────────┼──────────┼──────────┤
+│Total: 110│Total:  90│Total: 140│Total:  85│Total: 170│Total:  70│Total:   0│
+└──────────┴──────────┴──────────┴──────────┴──────────┴──────────┴──────────┘
+```
+
+**Elemen board:**
+- **Header kolom**: nama hari + tanggal. Hari ini di-highlight dengan warna latar
+- **Kartu resep**: setiap resep yang dijadwalkan ditampilkan sebagai kartu berisi nama menu, jumlah porsi, dan estimasi biaya per porsi
+- **Tombol "+ Tambah"**: di bawah setiap kolom untuk menambah menu baru ke hari tersebut
+- **Footer kapasitas**: total porsi per hari. Merah jika melebihi kapasitas maksimum
+
+**Navigasi minggu:**
+- Klik `<` untuk mundur 1 minggu
+- Klik `>` untuk maju 1 minggu
+- Label di tengah menunjukkan rentang tanggal minggu yang sedang dilihat
+
+**Responsif:** Di layar kecil (mobile), board bisa di-scroll horizontal.
+
+### 6.5 Menambah Menu ke Hari
+
+1. Klik tombol **"+ Tambah Menu"** di kolom hari yang diinginkan
+2. Dialog muncul dengan form:
+
+```
+┌─────────────────────────────────────┐
+│  Tambah Menu — Senin 22 Jun         │
+│                                     │
+│  Resep:    [Pilih resep... ▼]       │
+│                                     │
+│  Porsi:    [50        ]             │
+│                                     │
+│  Catatan:  [________________]       │
+│            (opsional)               │
+│                                     │
+│          [Batal]  [Tambah]          │
+└─────────────────────────────────────┘
+```
+
+3. **Pilih resep** dari dropdown (menampilkan semua resep aktif)
+4. **Masukkan jumlah porsi** yang akan diproduksi
+5. **Catatan** (opsional): instruksi khusus, mis. "Porsi lebih kecil untuk paket anak"
+6. Klik **Tambah**
+7. Kartu resep muncul di kolom hari yang dipilih
+
+**Validasi kapasitas:** Jika total porsi per hari sudah melebihi kapasitas maksimum, sistem akan menampilkan peringatan tapi tetap mengizinkan penambahan.
+
+### 6.6 Mengedit dan Menghapus Menu
+
+**Mengedit porsi:**
+1. Klik kartu resep yang ingin diedit
+2. Dialog edit muncul dengan jumlah porsi saat ini
+3. Ubah porsi atau catatan
+4. Klik **Simpan**
+
+**Menghapus menu:**
+1. Klik tombol **✕** (silang) di pojok kanan atas kartu resep
+2. Menu langsung dihapus dari jadwal
+
+**Catatan:** Edit dan hapus hanya bisa dilakukan jika jadwal masih berstatus **DRAFT** atau **ACTIVE**. Jadwal yang sudah **COMPLETED** bersifat read-only.
+
+### 6.7 Kapasitas Produksi Harian
+
+Setiap jadwal memiliki batas **kapasitas porsi per hari** (default: 200 porsi). Ini mewakili kemampuan produksi dapur Anda berdasarkan tenaga kerja, peralatan, dan waktu.
+
+**Indikator kapasitas** di footer setiap kolom:
+
+| Total Porsi vs Kapasitas | Warna | Arti |
+|--------------------------|-------|------|
+| < 80% kapasitas | Normal (default) | Masih banyak ruang |
+| 80% – 100% | Kuning + ⚠️ | Mendekati batas |
+| > 100% | Merah + ⚠️ | **Melebihi kapasitas!** |
+
+**Contoh:** Jika kapasitas = 200 porsi/hari:
+- 150 porsi → normal
+- 170 porsi → kuning (85%)
+- 220 porsi → merah (110%, melebihi kapasitas)
+
+**Mengubah kapasitas:** Saat membuat jadwal baru, isi field "Kapasitas Maksimum per Hari". Bisa disesuaikan per jadwal — misalnya minggu biasa 200, minggu Ramadhan 250.
+
+### 6.8 Status Jadwal
+
+Setiap jadwal memiliki 3 status dengan alur:
+
+```
+DRAFT  ──→  ACTIVE  ──→  COMPLETED
+(rencana)   (sedang     (sudah
+             dijalankan)  selesai)
+```
+
+| Status | Badge | Arti | Bisa Edit? |
+|--------|-------|------|-----------|
+| **DRAFT** | Abu-abu | Rencana awal, masih bisa diedit bebas | ✅ Ya |
+| **ACTIVE** | Hijau | Jadwal resmi untuk minggu ini, sedang dijalankan | ✅ Ya (fleksibel) |
+| **COMPLETED** | Biru | Minggu sudah selesai, jadwal diarsipkan | ❌ Read-only |
+
+**Mengaktifkan jadwal:**
+1. Pastikan jadwal masih DRAFT
+2. Klik tombol **"Aktifkan"**
+3. Jadwal berubah menjadi ACTIVE
+4. Jika sudah ada jadwal ACTIVE lain untuk minggu yang sama → jadwal lama diubah ke DRAFT
+
+**Menyelesaikan jadwal:**
+1. Di akhir minggu, klik **"Selesai"**
+2. Jadwal berubah menjadi COMPLETED dan menjadi read-only
+
+**Aturan:** Hanya boleh ada **1 jadwal ACTIVE** per minggu.
+
+### 6.9 Cek Ketersediaan Stok
+
+Fitur ini menghitung apakah stok bahan saat ini cukup untuk menjalankan seluruh jadwal minggu ini.
+
+**Cara menggunakan:**
+1. Klik tombol **"Cek Stok"** (ikon clipboard) di header
+2. Dialog muncul menampilkan tabel:
+
+```
+┌─────────────────────────────────────────────────────────┐
+│  Cek Ketersediaan Stok                                   │
+│                                                          │
+│  Item              Kebutuhan  Stok Saat Ini  Status      │
+│  ─────────────────────────────────────────────────────   │
+│  Ayam Fillet       22.5 kg    25.0 kg        ✅ Cukup    │
+│  Beras Premium     28.0 kg    60.0 kg        ✅ Cukup    │
+│  Bawang Merah       4.2 kg     3.0 kg        ❌ -1.2 kg  │
+│  Cabai Keriting     3.8 kg     2.0 kg        ❌ -1.8 kg  │
+│  Kentang           15.0 kg    12.0 kg        ❌ -3.0 kg  │
+│  Minyak Goreng     10.5 L     20.0 L         ✅ Cukup    │
+│  ...                                                     │
+│                                                          │
+│  Ringkasan: 18 item cukup, 5 item kekurangan            │
+│                                                          │
+│                     [Buat Daftar Belanja]                 │
+└─────────────────────────────────────────────────────────┘
+```
+
+**Cara perhitungan:**
+Untuk setiap resep di jadwal:
+- Total bahan = (qty bahan per porsi dari resep) × (jumlah porsi di jadwal)
+- Jika resep yang sama dijadwalkan di beberapa hari, kebutuhan bahan dijumlahkan
+- Dibandingkan dengan stok saat ini → surplus (cukup) atau deficit (kurang)
+
+**Status per item:**
+- ✅ **Cukup** — stok mencukupi untuk seluruh jadwal
+- ❌ **Kurang X** — kekurangan (angka merah), perlu beli
+
+### 6.10 Buat Daftar Belanja (Auto-Generate PO)
+
+Fitur ini membuat Draft PO otomatis untuk semua bahan yang kekurangan stok.
+
+**Cara menggunakan:**
+1. Klik **"Buat Daftar Belanja"** (ikon keranjang) di header, ATAU klik dari dialog Cek Stok
+2. Konfirmasi: "Ini akan membuat Draft PO berdasarkan kekurangan stok. Lanjutkan?"
+3. Klik **"Ya, Buat"**
+4. Sistem akan:
+   - Hitung item yang deficit
+   - Cari supplier terbaik per item (dari histori pembelian terakhir, termurah)
+   - Group per supplier → 1 Draft PO per supplier
+5. Dialog hasil muncul:
+
+```
+┌──────────────────────────────────────────┐
+│  Daftar Belanja Berhasil Dibuat!          │
+│                                          │
+│  PO-20260621-015  PT Sumber Makmur       │
+│    3 item  •  Rp 850.000                 │
+│                                          │
+│  PO-20260621-016  UD Rempah Nusantara    │
+│    2 item  •  Rp 280.000                 │
+│                                          │
+│  Total: 5 item  •  Rp 1.130.000         │
+│                                          │
+│                              [Tutup]     │
+└──────────────────────────────────────────┘
+```
+
+6. Buka **Pembelian → Purchase Order** untuk mereview dan approve Draft PO yang dibuat
+
+### 6.11 Template Jadwal
+
+Template memungkinkan Anda menyimpan pola jadwal dan menggunakannya kembali di minggu-minggu berikutnya.
+
+**Menyimpan jadwal sebagai template:**
+1. Buat dan isi jadwal seperti biasa
+2. Klik dropdown **Template** → **"Simpan sebagai Template"**
+3. Isi nama (mis. "Jadwal Standar Weekday") dan deskripsi
+4. Klik **Simpan**
+5. Template tersimpan — bisa dipakai di minggu lain
+
+**Menerapkan template ke minggu baru:**
+1. Navigasi ke minggu yang belum ada jadwalnya
+2. Klik dropdown **Template** → pilih template yang tersedia
+3. Atau dari halaman **Pengaturan → Template Meal Plan** → klik **"Terapkan"** → pilih tanggal mulai minggu
+4. Jadwal DRAFT baru dibuat dengan menu dan porsi dari template
+
+**Mengelola template:**
+- Buka **Pengaturan → Template Meal Plan** di sidebar
+- Lihat daftar semua template (nama, jumlah item, tanggal dibuat)
+- **Terapkan** — buat jadwal baru dari template
+- **Hapus** — hapus template yang tidak dipakai lagi
+
+**Tips template:**
+- Buat template "Standar Weekday" untuk hari kerja biasa
+- Buat template "Weekend" untuk akhir pekan
+- Buat template "Ramadhan" dengan menu dan porsi khusus bulan puasa
+- Setelah terapkan template, Anda masih bisa edit jadwal (tambah/hapus/ubah porsi)
+
+### 6.12 Saran Jadwal dari Data Historis
+
+Sistem bisa merekomendasikan jadwal berdasarkan **pola produksi 4 minggu terakhir**.
+
+**Cara kerja:**
+- Sistem menganalisis produksi yang sudah tercatat di sistem
+- Untuk setiap hari dalam seminggu, dilihat resep apa yang paling sering diproduksi dan berapa rata-rata porsinya
+- Hasilnya menjadi saran jadwal
+
+**Contoh saran:**
+```
+Senin: Nasi Goreng (50 porsi), Ayam Geprek (60 porsi), Es Teh (80 porsi)
+Selasa: Ayam Geprek (55 porsi), Sop Ayam (35 porsi)
+...
+```
+
+Saran ini bisa diterapkan langsung sebagai jadwal baru atau sebagai referensi saat membuat jadwal manual.
+
+### 6.13 Alur Kerja Lengkap
+
+Berikut alur kerja yang direkomendasikan setiap minggu:
+
+```
+┌─ JUMAT / SABTU (Perencanaan minggu depan) ─────────────────┐
+│                                                             │
+│  1. Buka Meal Prep → navigasi ke minggu depan               │
+│  2. Terapkan template ATAU buat jadwal baru                 │
+│  3. Sesuaikan menu dan porsi per hari                       │
+│  4. Cek Stok → lihat item yang kurang                      │
+│  5. Buat Daftar Belanja → Draft PO otomatis terkirim       │
+│  6. Review & Approve PO di halaman Purchase Order           │
+│                                                             │
+└─────────────────────────────────────────────────────────────┘
+                            ↓
+┌─ SENIN (Mulai produksi) ───────────────────────────────────┐
+│                                                             │
+│  7. Aktifkan jadwal (DRAFT → ACTIVE)                       │
+│  8. Kitchen Manager produksi sesuai jadwal harian           │
+│  9. Jika ada perubahan di tengah minggu → edit jadwal       │
+│                                                             │
+└─────────────────────────────────────────────────────────────┘
+                            ↓
+┌─ AKHIR MINGGU ─────────────────────────────────────────────┐
+│                                                             │
+│ 10. Tandai jadwal Selesai (ACTIVE → COMPLETED)              │
+│ 11. Simpan sebagai template jika jadwal ini ingin dipakai   │
+│     lagi minggu depan                                       │
+│ 12. Mulai perencanaan minggu berikutnya                     │
+│                                                             │
+└─────────────────────────────────────────────────────────────┘
+```
+
+### 6.14 Tips & Best Practices
+
+1. **Rencanakan 1 minggu sebelumnya** — Buat jadwal minggu depan paling lambat hari Jumat, agar PO bisa diproses dan barang datang sebelum Senin.
+
+2. **Mulai dari template** — Jangan mulai dari nol setiap minggu. Simpan jadwal yang berhasil sebagai template, terapkan, lalu modifikasi sedikit.
+
+3. **Gunakan saran historis** — Saat bingung, lihat saran dari sistem berdasarkan 4 minggu terakhir. Ini mencerminkan pola aktual dapur Anda.
+
+4. **Cek stok sebelum finalisasi** — Selalu klik "Cek Stok" sebelum mengaktifkan jadwal. Lebih baik tahu kekurangan sekarang daripada saat mau masak.
+
+5. **Satu jadwal per minggu** — Hanya buat 1 jadwal yang di-ACTIVE-kan per minggu. Ini menghindari kebingungan di dapur.
+
+6. **Sesuaikan kapasitas per event** — Minggu biasa: 200 porsi/hari. Minggu Ramadhan: 250. Event catering: 300. Atur di saat buat jadwal.
+
+7. **Integrasikan dengan Forecasting** — Gunakan data dari halaman Prediksi Bahan (Forecasting) sebagai input jumlah porsi yang realistis.
+
+8. **Review Draft PO** — Daftar belanja otomatis adalah rekomendasi. Selalu cek harga dan qty sebelum approve PO.
+
+9. **Tandai selesai di akhir minggu** — Ini membantu menjaga riwayat jadwal yang rapi dan membedakan minggu aktif dari arsip.
+
+10. **Libatkan Kitchen Manager** — Jadwal yang baik adalah hasil kolaborasi antara Purchaser (ketersediaan bahan) dan Kitchen Manager (kelayakan produksi).
+
+### 6.15 FAQ Meal Prep Planner
+
+**Q: Apakah jadwal otomatis membuat catatan produksi?**
+A: Tidak. Jadwal adalah rencana. Pencatatan produksi aktual tetap dilakukan secara terpisah di menu Produksi → Produksi Harian. Jadwal membantu planning, bukan otomasi eksekusi.
+
+**Q: Bisa buat lebih dari 1 jadwal untuk minggu yang sama?**
+A: Bisa, tapi hanya 1 yang boleh ACTIVE. Jadwal lainnya akan berstatus DRAFT. Ini berguna untuk membuat beberapa alternatif jadwal sebelum memilih yang terbaik.
+
+**Q: Apa yang terjadi jika saya menambah menu melebihi kapasitas?**
+A: Sistem menampilkan peringatan (warna merah + ikon warning) tapi tidak memblokir penambahan. Keputusan tetap di tangan Anda — mungkin hari itu memang mau lembur atau tambah staff.
+
+**Q: Daftar belanja memilih supplier berdasarkan apa?**
+A: Dari data PriceHistory (histori pembelian terakhir), dipilih supplier dengan harga termurah untuk setiap item. Jika tidak ada histori, item akan dilewati dan perlu dibuatkan PO manual.
+
+**Q: Bisakah mengedit jadwal yang sudah ACTIVE?**
+A: Ya, jadwal ACTIVE masih bisa diedit (tambah/hapus menu, ubah porsi). Ini memungkinkan fleksibilitas jika ada perubahan mendadak di tengah minggu.
+
+**Q: Bisakah mengedit jadwal yang sudah COMPLETED?**
+A: Tidak, jadwal COMPLETED bersifat read-only sebagai arsip. Jika ingin menggunakan jadwal serupa, simpan sebagai template lalu terapkan ke minggu baru.
+
+**Q: Template menyimpan apa saja?**
+A: Template menyimpan: resep apa di hari apa dan berapa porsi. Template tidak menyimpan tanggal spesifik — saat diterapkan, menu di-mapping ke hari yang sesuai di minggu tujuan.
+
+**Q: Apa hubungan dengan fitur Forecasting?**
+A: Keduanya saling melengkapi:
+- **Forecasting** → memprediksi berapa banyak bahan yang dibutuhkan berdasarkan statistik historis
+- **Meal Prep** → merencanakan secara spesifik menu apa diproduksi kapan
+- Gunakan angka dari Forecasting sebagai panduan saat menentukan porsi di Meal Prep
+- Keduanya bisa generate Draft PO, tapi dari sumber data yang berbeda
+
+**Q: Bagaimana jika hari tertentu tidak ada produksi (misal Minggu tutup)?**
+A: Cukup jangan tambahkan menu apapun di kolom Minggu. Kolom tetap ditampilkan tapi kosong, dan total porsi = 0.
+
+**Q: Bisa print jadwal mingguan?**
+A: Saat ini belum ada fitur print/PDF khusus untuk jadwal. Anda bisa menggunakan fitur print browser (Ctrl+P) sebagai alternatif.
+
+---
+
 ## Glosarium
 
 | Istilah | Penjelasan |
@@ -1306,6 +1710,11 @@ A: Untuk industri F&B dengan pola harian yang konsisten, akurasi 80-90% (MAPE 10
 | **Seasonal Factor** | Faktor pengali untuk menyesuaikan prediksi pada event tertentu (Ramadhan, promo, dll) |
 | **Horizon** | Jangka waktu prediksi ke depan (7/14/30 hari) |
 | **Rekonsiliasi** | Proses mencocokkan prediksi yang sudah lewat dengan konsumsi aktual untuk menghitung akurasi |
+| **Meal Plan** | Jadwal produksi mingguan yang berisi daftar resep per hari beserta jumlah porsi |
+| **Template** | Pola jadwal yang disimpan untuk digunakan kembali di minggu-minggu berikutnya |
+| **Kapasitas Harian** | Batas maksimum porsi yang bisa diproduksi per hari berdasarkan kemampuan dapur |
+| **Daftar Belanja** | Konsolidasi kebutuhan bahan dari jadwal mingguan yang dikonversi menjadi Draft PO |
+| **Stock Check** | Pengecekan ketersediaan stok bahan terhadap kebutuhan jadwal produksi |
 
 ---
 
