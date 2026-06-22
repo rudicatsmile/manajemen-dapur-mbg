@@ -2,6 +2,7 @@ import { Injectable } from '@nestjs/common';
 import { PrismaService } from '../../prisma/prisma.service';
 import { SeasonalFactorService } from './seasonal-factor.service';
 import { generateDocNumber } from '../../common/helpers/doc-number.helper';
+import { getBranchStockQty } from '../../common/helpers/stock.helper';
 
 const DAY_NAMES = ['Minggu', 'Senin', 'Selasa', 'Rabu', 'Kamis', 'Jumat', 'Sabtu'] as const;
 const HISTORY_DAYS = 60;
@@ -50,7 +51,17 @@ export class ForecastingService {
     private readonly seasonalFactorService: SeasonalFactorService,
   ) {}
 
-  async getDemandForecast(horizonDays: number = 7): Promise<ForecastItem[]> {
+  /** Stok untuk forecast: cabang spesifik atau agregat semua cabang (mode ALL). */
+  private async forecastStock(branchId: number | null, itemId: number): Promise<number> {
+    if (branchId) return getBranchStockQty(this.prisma, branchId, itemId);
+    const agg = await this.prisma.branchStock.aggregate({
+      where: { itemId },
+      _sum: { currentStock: true },
+    });
+    return Number(agg._sum.currentStock ?? 0);
+  }
+
+  async getDemandForecast(branchId: number | null, horizonDays: number = 7): Promise<ForecastItem[]> {
     const now = new Date();
     const historyStart = new Date(now);
     historyStart.setDate(historyStart.getDate() - HISTORY_DAYS);
@@ -61,6 +72,7 @@ export class ForecastingService {
         production: {
           status: 'COMPLETED',
           productionDate: { gte: historyStart },
+          ...(branchId ? { branchId } : {}),
         },
       },
       include: {
@@ -127,7 +139,7 @@ export class ForecastingService {
 
       const safetyStock = Z_SCORE * stdDev * Math.sqrt(DEFAULT_LEAD_TIME);
       const totalNeeded = predictedDemand + safetyStock;
-      const currentStock = Number(item.currentStock);
+      const currentStock = await this.forecastStock(branchId, itemId);
       const shortage = Math.max(0, totalNeeded - currentStock);
 
       // Confidence
@@ -163,7 +175,7 @@ export class ForecastingService {
     return results.sort((a, b) => b.shortage - a.shortage);
   }
 
-  async getItemForecastDetail(itemId: number, horizonDays: number = 14) {
+  async getItemForecastDetail(branchId: number | null, itemId: number, horizonDays: number = 14) {
     const now = new Date();
     const historyStart = new Date(now);
     historyStart.setDate(historyStart.getDate() - HISTORY_DAYS);
@@ -179,6 +191,7 @@ export class ForecastingService {
         production: {
           status: 'COMPLETED',
           productionDate: { gte: historyStart },
+          ...(branchId ? { branchId } : {}),
         },
       },
       include: { production: { select: { productionDate: true } } },
@@ -265,7 +278,7 @@ export class ForecastingService {
         sku: item.sku,
         categoryName: item.category.name,
         unit: item.baseUnit.abbreviation,
-        currentStock: Number(item.currentStock),
+        currentStock: await this.forecastStock(branchId, itemId),
         minStock: Number(item.minStock),
       },
       stats: {
@@ -282,8 +295,8 @@ export class ForecastingService {
     };
   }
 
-  async generateDraftPO(horizonDays: number, userId: number): Promise<{ poIds: number[] }> {
-    const forecast = await this.getDemandForecast(horizonDays);
+  async generateDraftPO(branchId: number, horizonDays: number, userId: number): Promise<{ poIds: number[] }> {
+    const forecast = await this.getDemandForecast(branchId, horizonDays);
     const shortageItems = forecast.filter(f => f.shortage > 0);
 
     if (shortageItems.length === 0) {
@@ -353,6 +366,7 @@ export class ForecastingService {
       const po = await this.prisma.purchaseOrder.create({
         data: {
           poNumber,
+          branchId,
           supplierId,
           poDate: new Date(),
           expectedDate: new Date(Date.now() + DEFAULT_LEAD_TIME * 24 * 60 * 60 * 1000),

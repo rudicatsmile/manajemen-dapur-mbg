@@ -84,6 +84,21 @@
    - 7.10 [Input Batch Saat Receiving](#710-input-batch-saat-receiving)
    - 7.11 [Tips & Best Practices](#711-tips--best-practices)
    - 7.12 [FAQ FIFO & Expiry](#712-faq-fifo--expiry)
+8. [Multi-Cabang & Transfer Stok](#8-multi-cabang--transfer-stok)
+   - 8.1 [Tentang Multi-Cabang](#81-tentang-multi-cabang)
+   - 8.2 [Konsep: Master Shared & Stok Per-Cabang](#82-konsep-master-shared--stok-per-cabang)
+   - 8.3 [Branch Switcher — Memilih Cabang Aktif](#83-branch-switcher--memilih-cabang-aktif)
+   - 8.4 [Mode "Semua Cabang" (Konsolidasi)](#84-mode-semua-cabang-konsolidasi)
+   - 8.5 [Mengelola Cabang](#85-mengelola-cabang)
+   - 8.6 [Menempatkan Pengguna ke Cabang](#86-menempatkan-pengguna-ke-cabang)
+   - 8.7 [Bagaimana Transaksi Terikat Cabang](#87-bagaimana-transaksi-terikat-cabang)
+   - 8.8 [Transfer Stok — Alur Lengkap](#88-transfer-stok--alur-lengkap)
+   - 8.9 [Membuat Permintaan Transfer](#89-membuat-permintaan-transfer)
+   - 8.10 [Menyetujui, Menolak, Membatalkan](#810-menyetujui-menolak-membatalkan)
+   - 8.11 [Mengirim & Menerima Transfer](#811-mengirim--menerima-transfer)
+   - 8.12 [Laporan Perbandingan Cabang](#812-laporan-perbandingan-cabang)
+   - 8.13 [Tips & Best Practices](#813-tips--best-practices)
+   - 8.14 [FAQ Multi-Cabang](#814-faq-multi-cabang)
 
 ---
 
@@ -2068,6 +2083,199 @@ A: Alert muncul di notification bell (in-app). Integrasi WhatsApp untuk alert ex
 
 ---
 
+## 8. Multi-Cabang & Transfer Stok
+
+### 8.1 Tentang Multi-Cabang
+
+Fitur **Multi-Cabang** membuat aplikasi siap dipakai oleh bisnis yang beroperasi di **lebih dari satu lokasi dapur**. Setiap cabang punya stok sendiri, transaksinya sendiri, dan dashboard-nya sendiri — sementara data master (item, resep, supplier, kategori, satuan) tetap **dipakai bersama** seluruh cabang.
+
+**Yang bisa dilakukan:**
+- Membuat dan mengelola banyak cabang
+- Menempatkan setiap pengguna ke satu atau beberapa cabang
+- Memisahkan stok, pembelian, produksi, waste, dan opname per cabang
+- Memindahkan stok antar cabang lewat alur **Transfer Stok** yang terkontrol
+- Membandingkan performa antar cabang (revenue, food cost, waste, pembelian)
+
+**Siapa yang memakai:**
+- **Owner** — akses semua cabang + view konsolidasi "Semua Cabang"
+- **Admin** — mengelola cabang, penempatan user, dan persetujuan
+- **Purchaser / Kitchen Manager** — bekerja di cabang yang ditugaskan kepadanya
+
+### 8.2 Konsep: Master Shared & Stok Per-Cabang
+
+Penting untuk memahami pemisahan ini:
+
+| Jenis Data | Lingkup | Penjelasan |
+|------------|---------|-----------|
+| Item, Resep, Supplier, Kategori, Satuan | **Shared (global)** | Satu katalog dipakai semua cabang. Menambah item baru otomatis tersedia di semua cabang. |
+| **Stok** (jumlah & minimum) | **Per-cabang** | Setiap cabang punya angka stok sendiri untuk tiap item. Stok Ayam di Pusat tidak sama dengan di Selatan. |
+| PO, Penerimaan, Produksi, Waste, Opname, Mutasi, Batch | **Per-cabang** | Setiap transaksi tercatat pada satu cabang. |
+
+> **Catatan:** Karena master item shared, harga terakhir (last price) sebuah item bersifat global. Yang per-cabang adalah **jumlah stok**, bukan identitas item.
+
+### 8.3 Branch Switcher — Memilih Cabang Aktif
+
+Di **header (kanan atas)**, ada dropdown **pemilih cabang** (ikon gedung). Cabang yang dipilih di sini menjadi **cabang aktif** — semua halaman (stok, PO, produksi, dashboard, dst.) otomatis menampilkan data cabang tersebut.
+
+**Cara kerja:**
+1. Klik dropdown cabang di header
+2. Pilih cabang (mis. "Cabang Selatan")
+3. Seluruh data di layar langsung berganti mengikuti cabang itu
+4. Pilihan tersimpan — saat login berikutnya, cabang terakhir tetap aktif
+
+> Jika akun Anda hanya ditempatkan di **satu cabang**, switcher otomatis terkunci ke cabang itu.
+
+### 8.4 Mode "Semua Cabang" (Konsolidasi)
+
+Khusus **Owner dan Admin**, dropdown punya opsi tambahan **"Semua Cabang"**. Saat dipilih:
+- Dashboard menampilkan **angka gabungan** seluruh cabang
+- Stok ditampilkan sebagai **total** lintas cabang (mis. Ayam Pusat 25 + Selatan 10 = 35)
+- Daftar transaksi menampilkan data dari semua cabang
+
+Mode ini untuk **pandangan helikopter** pemilik bisnis. Untuk operasional harian (membuat PO, produksi, transfer), pilih **cabang spesifik** — beberapa aksi tidak bisa dijalankan di mode "Semua Cabang" karena harus terikat ke satu cabang.
+
+### 8.5 Mengelola Cabang
+
+Buka **Pengaturan → Cabang** di sidebar (khusus Owner/Admin).
+
+**Menambah cabang:**
+1. Klik **"Tambah Cabang"**
+2. Isi:
+   - **Kode** — singkat & unik, huruf kapital/angka/strip (mis. `CBG-01`, `PST`)
+   - **Nama** — nama lengkap cabang (mis. "Cabang Selatan")
+   - **Alamat** dan **Telepon** (opsional)
+   - **Cabang default** — centang bila ini cabang utama (hanya satu cabang bisa default)
+3. Klik **Simpan**
+
+**Mengedit / menonaktifkan:**
+- Ikon **pensil** untuk mengubah data cabang
+- Ikon **power** untuk menonaktifkan cabang (cabang default tidak bisa dinonaktifkan). Cabang nonaktif hilang dari switcher, tapi data historisnya tetap tersimpan.
+
+Setiap baris menampilkan jumlah **anggota (user)** dan jumlah **item berstok** di cabang tersebut.
+
+### 8.6 Menempatkan Pengguna ke Cabang
+
+Pengguna hanya bisa mengakses cabang tempat ia ditugaskan (kecuali Owner yang bebas akses semua cabang).
+
+**Cara menempatkan:**
+1. Di halaman **Pengaturan → Cabang**, klik ikon **anggota** (orang) pada baris cabang
+2. Centang pengguna yang ingin ditempatkan di cabang itu
+3. Klik **Simpan**
+
+Satu pengguna bisa ditempatkan di **beberapa cabang** sekaligus — ia lalu bisa berpindah-pindah lewat branch switcher.
+
+> Saat login, sistem mengembalikan daftar cabang yang boleh diakses + cabang default user untuk mengisi switcher.
+
+### 8.7 Bagaimana Transaksi Terikat Cabang
+
+Setiap transaksi otomatis tercatat pada **cabang aktif** saat dibuat:
+
+| Transaksi | Cabang yang dipakai |
+|-----------|---------------------|
+| Purchase Order, Produksi, Waste, Stok Opname, Penyesuaian Stok | Cabang aktif di switcher |
+| Penerimaan (Receiving) | Mengikuti cabang **PO**-nya |
+| Batch (FIFO) | Mengikuti cabang penerimaannya |
+| Mutasi Stok | Cabang tempat stok berubah |
+
+Akibatnya: menerima barang di **Cabang A** hanya menambah stok di A; produksi di A hanya mengurangi stok A. Stok cabang lain tidak terpengaruh.
+
+### 8.8 Transfer Stok — Alur Lengkap
+
+Untuk memindahkan stok dari satu cabang ke cabang lain, gunakan **Stok → Transfer Stok**. Alurnya berjenjang agar terkontrol:
+
+```
+DIMINTA ──► DISETUJUI ──► DIKIRIM ──► DITERIMA
+(REQUESTED)  (APPROVED)   (SHIPPED)   (RECEIVED)
+   │             │
+   └─► DITOLAK   └─► DIBATALKAN
+     (REJECTED)    (CANCELLED)
+```
+
+- **Diminta** — permintaan dibuat (belum mempengaruhi stok)
+- **Disetujui** — Owner/Admin menyetujui (stok asal dicek cukup)
+- **Dikirim** — stok **berkurang** di cabang asal (mutasi `TRF_OUT`)
+- **Diterima** — stok **bertambah** di cabang tujuan (mutasi `TRF_IN`)
+
+Stok baru benar-benar pindah saat **Kirim** dan **Terima**, bukan saat permintaan dibuat.
+
+### 8.9 Membuat Permintaan Transfer
+
+1. Buka **Stok → Transfer Stok** → klik **"Buat Transfer"**
+2. Isi **Cabang Asal** (default: cabang aktif) dan **Cabang Tujuan** (harus berbeda)
+3. Pilih **Tanggal Permintaan**
+4. Tambahkan **item**: pilih item, isi jumlah, satuan otomatis terisi dari item
+5. Tambah catatan bila perlu, lalu klik **"Buat Permintaan"**
+
+Transfer dibuat dengan status **Diminta**, dan notifikasi terkirim ke Admin untuk persetujuan.
+
+### 8.10 Menyetujui, Menolak, Membatalkan
+
+Di **halaman detail transfer**, tombol aksi muncul sesuai status dan peran Anda:
+
+- **Setujui / Tolak** (Owner/Admin) — saat status **Diminta**. Saat menyetujui, sistem mengecek stok cabang asal cukup; bila kurang, persetujuan ditolak dengan pesan.
+- **Batalkan** — selama status masih **Diminta** atau **Disetujui** (belum dikirim).
+
+Setiap perubahan status mengirim notifikasi ke peran terkait.
+
+### 8.11 Mengirim & Menerima Transfer
+
+- **Kirim** (Owner/Admin/Kitchen Manager) — saat status **Disetujui**. Stok dikurangi dari cabang asal sesuai jumlah, status menjadi **Dikirim**, dan tercatat mutasi `TRF_OUT` di cabang asal.
+- **Terima** (Owner/Admin/Kitchen Manager) — saat status **Dikirim**. Stok ditambahkan ke cabang tujuan, status menjadi **Diterima**, dan tercatat mutasi `TRF_IN` di cabang tujuan.
+
+> **Susut perjalanan:** jumlah diterima boleh lebih kecil dari jumlah dikirim (mis. ada yang rusak di jalan). Selisihnya tidak otomatis kembali ke asal — catat terpisah bila perlu penyesuaian.
+
+Halaman detail menampilkan tabel item dengan kolom **Diminta / Dikirim / Diterima** sehingga seluruh riwayat angka transparan.
+
+### 8.12 Laporan Perbandingan Cabang
+
+Buka **Laporan → Perbandingan Cabang** (Owner/Admin). Pilih rentang tanggal, lalu sistem menampilkan tabel performa **per cabang**:
+
+| Kolom | Arti |
+|-------|------|
+| **Revenue** | Nilai produksi = jumlah porsi diproduksi × harga jual resep |
+| **Porsi** | Total porsi diproduksi pada periode |
+| **Food Cost %** | (Biaya bahan / Revenue) × 100. Berwarna **hijau** <30%, **kuning** 30–40%, **merah** >40% |
+| **Waste** | Total nilai Rupiah waste (+ jumlah kejadian) |
+| **Pembelian** | Total nilai PO (non-cancelled) |
+
+Baris **Total / Rata-rata** merangkum seluruh cabang. Klik **"Unduh PDF"** untuk mengekspor laporan (dibuat di sisi browser, format A4).
+
+### 8.13 Tips & Best Practices
+
+- **Tetapkan satu cabang default** sebagai pusat — pengguna baru dan transaksi tanpa konteks akan mengarah ke sana.
+- **Tempatkan user seperlunya.** Purchaser/Kitchen cukup di cabang operasionalnya; jangan beri akses semua cabang kecuali memang perlu.
+- **Selalu cek cabang aktif** di switcher sebelum membuat PO/produksi, agar transaksi tidak salah cabang.
+- **Pakai Transfer Stok**, jangan Penyesuaian manual, untuk memindahkan barang antar cabang — agar kedua sisi tercatat (`TRF_OUT`/`TRF_IN`) dan dapat ditelusuri.
+- **Bandingkan cabang berkala** (mingguan/bulanan) lewat laporan Perbandingan Cabang untuk menemukan cabang ber-food-cost tinggi atau waste berlebih.
+
+### 8.14 FAQ Multi-Cabang
+
+**Q: Kalau saya menambah item baru, apakah muncul di semua cabang?**
+A: Ya. Item adalah data master shared. Yang per-cabang hanya jumlah stoknya — item baru mulai dari stok 0 di setiap cabang sampai ada penerimaan/penyesuaian.
+
+**Q: Kenapa stok item berbeda saat saya ganti cabang?**
+A: Memang seharusnya begitu. Stok bersifat per-cabang. Untuk melihat total semua cabang, pilih "Semua Cabang" (Owner/Admin).
+
+**Q: Kenapa saya tidak bisa membuat PO/transfer saat memilih "Semua Cabang"?**
+A: Aksi yang membuat transaksi harus terikat ke satu cabang. Pilih cabang spesifik dulu di switcher.
+
+**Q: Apakah stok langsung pindah begitu permintaan transfer dibuat?**
+A: Tidak. Stok asal berkurang saat **Kirim**, dan stok tujuan bertambah saat **Terima**. Saat "Diminta"/"Disetujui" stok belum berubah.
+
+**Q: Bisakah transfer ke cabang yang sama?**
+A: Tidak. Cabang asal dan tujuan harus berbeda — sistem menolak permintaan cabang yang sama.
+
+**Q: Pengguna cabang A bisa melihat data cabang B?**
+A: Tidak, kecuali ia juga ditempatkan di cabang B (atau berperan Owner). Akses divalidasi setiap permintaan.
+
+**Q: Apa yang terjadi jika jumlah diterima lebih kecil dari yang dikirim?**
+A: Hanya jumlah diterima yang masuk ke stok cabang tujuan. Selisihnya dianggap susut — lakukan penyesuaian/waste terpisah bila perlu dibukukan.
+
+**Q: Cabang lama bisa dihapus?**
+A: Cabang tidak dihapus permanen, melainkan **dinonaktifkan** agar data historis (transaksi, stok, transfer) tetap utuh. Cabang default tidak bisa dinonaktifkan.
+
+---
+
 ## Glosarium
 
 | Istilah | Penjelasan |
@@ -2105,6 +2313,15 @@ A: Alert muncul di notification bell (in-app). Integrasi WhatsApp untuk alert ex
 | **At-Risk Value** | Nilai Rupiah dari batch yang mendekati expired, menunjukkan potensi kerugian |
 | **Auto-Expire** | Proses otomatis menandai batch yang sudah melewati tanggal expired sebagai waste |
 | **Perishable** | Bahan yang cepat rusak/busuk dan perlu tracking expiry (daging, sayur, susu) |
+| **Cabang (Branch)** | Lokasi dapur operasional yang punya stok dan transaksi sendiri |
+| **Master Shared** | Data yang dipakai bersama semua cabang (item, resep, supplier, kategori, satuan) |
+| **Stok Per-Cabang** | Jumlah stok yang dihitung terpisah untuk setiap cabang (tabel BranchStock) |
+| **Branch Switcher** | Pemilih cabang aktif di header yang menentukan data cabang mana yang ditampilkan |
+| **Cabang Aktif** | Cabang yang sedang dipilih; semua halaman & transaksi mengikuti cabang ini |
+| **Mode Konsolidasi** | Pilihan "Semua Cabang" (Owner/Admin) yang menampilkan angka gabungan lintas cabang |
+| **Cabang Default** | Cabang utama; tujuan transaksi tanpa konteks dan tidak bisa dinonaktifkan |
+| **Transfer Stok** | Pemindahan stok antar cabang lewat alur Diminta → Disetujui → Dikirim → Diterima |
+| **TRF_OUT / TRF_IN** | Jenis mutasi stok keluar (cabang asal) / masuk (cabang tujuan) akibat transfer |
 
 ---
 

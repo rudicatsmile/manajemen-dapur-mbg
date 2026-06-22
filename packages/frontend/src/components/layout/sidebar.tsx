@@ -8,7 +8,7 @@ import {
   Package, ArrowLeftRight, ClipboardCheck, ChefHat, CalendarDays,
   Trash2, Calculator, BarChart3, TrendingUp, TrendingDown, Users, Tag, Ruler,
   ChevronDown, ChevronRight, Menu, Bell, Award, LineChart, Calendar,
-  CalendarRange, UtensilsCrossed, Timer,
+  CalendarRange, UtensilsCrossed, Timer, Building2, ArrowRightLeft,
 } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { useAuthStore } from '@/stores/auth-store';
@@ -56,6 +56,7 @@ const navGroups: NavGroup[] = [
       { title: 'Master Item', href: '/stok/item', icon: Package },
       { title: 'Mutasi Stok', href: '/stok/mutasi', icon: ArrowLeftRight },
       { title: 'Stok Opname', href: '/stok/opname', icon: ClipboardCheck },
+      { title: 'Transfer Stok', href: '/stok/transfer', icon: ArrowRightLeft },
       { title: 'Histori Harga', href: '/stok/histori-harga', icon: TrendingDown },
       { title: 'Batch & Expiry', href: '/stok/batch-tracking', icon: Timer },
     ],
@@ -75,6 +76,7 @@ const navGroups: NavGroup[] = [
     items: [
       { title: 'Biaya Per Porsi', href: '/laporan/biaya-per-porsi', icon: Calculator },
       { title: 'Menu Engineering', href: '/laporan/menu-engineering', icon: TrendingUp },
+      { title: 'Perbandingan Cabang', href: '/laporan/perbandingan-cabang', icon: Building2 },
       { title: 'Laporan', href: '/laporan', icon: BarChart3 },
     ],
   },
@@ -82,6 +84,7 @@ const navGroups: NavGroup[] = [
     title: 'Pengaturan',
     adminOnly: true,
     items: [
+      { title: 'Cabang', href: '/pengaturan/cabang', icon: Building2 },
       { title: 'Pengguna', href: '/pengaturan/user', icon: Users },
       { title: 'Kategori', href: '/pengaturan/kategori', icon: Tag },
       { title: 'Satuan', href: '/pengaturan/satuan', icon: Ruler },

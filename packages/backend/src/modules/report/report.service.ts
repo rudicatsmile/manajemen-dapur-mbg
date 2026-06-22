@@ -78,6 +78,97 @@ export class ReportService {
     return { wastes, period: { from, to } };
   }
 
+  /** Perbandingan performa antar cabang dalam rentang tanggal (Fase 3 multi-cabang). */
+  async branchComparison(from: string, to: string) {
+    const fromDate = new Date(from);
+    const toDate = new Date(to);
+    toDate.setHours(23, 59, 59, 999);
+
+    const [branches, productions, wastes, purchases] = await Promise.all([
+      this.prisma.branch.findMany({
+        where: { isActive: true },
+        orderBy: [{ isDefault: 'desc' }, { name: 'asc' }],
+        select: { id: true, code: true, name: true },
+      }),
+      this.prisma.production.findMany({
+        where: { status: 'COMPLETED', productionDate: { gte: fromDate, lte: toDate } },
+        select: {
+          branchId: true,
+          plannedQty: true,
+          actualQty: true,
+          recipe: { select: { sellingPrice: true, estimatedCost: true } },
+        },
+      }),
+      this.prisma.wasteRecord.findMany({
+        where: { wasteDate: { gte: fromDate, lte: toDate } },
+        select: { branchId: true, quantity: true, item: { select: { lastPrice: true } } },
+      }),
+      this.prisma.purchaseOrder.groupBy({
+        by: ['branchId'],
+        where: { poDate: { gte: fromDate, lte: toDate }, status: { not: 'CANCELLED' } },
+        _sum: { totalAmount: true },
+      }),
+    ]);
+
+    const purchaseMap = new Map(purchases.map((p) => [p.branchId, Number(p._sum.totalAmount ?? 0)]));
+
+    const rows = branches.map((b) => {
+      let revenue = 0;
+      let foodCost = 0;
+      let portions = 0;
+      for (const p of productions) {
+        if (p.branchId !== b.id) continue;
+        const qty = Number(p.actualQty ?? p.plannedQty);
+        portions += qty;
+        revenue += qty * Number(p.recipe.sellingPrice);
+        foodCost += qty * Number(p.recipe.estimatedCost);
+      }
+
+      let wasteValue = 0;
+      let wasteCount = 0;
+      for (const w of wastes) {
+        if (w.branchId !== b.id) continue;
+        wasteCount += 1;
+        wasteValue += Number(w.quantity) * Number(w.item.lastPrice);
+      }
+
+      const foodCostPct = revenue > 0 ? (foodCost / revenue) * 100 : 0;
+
+      return {
+        branchId: b.id,
+        branchCode: b.code,
+        branchName: b.name,
+        revenue: Math.round(revenue),
+        foodCost: Math.round(foodCost),
+        foodCostPercentage: Math.round(foodCostPct * 100) / 100,
+        portions: Math.round(portions * 100) / 100,
+        wasteValue: Math.round(wasteValue),
+        wasteCount,
+        purchaseTotal: Math.round(purchaseMap.get(b.id) ?? 0),
+      };
+    });
+
+    const totals = rows.reduce(
+      (acc, r) => ({
+        revenue: acc.revenue + r.revenue,
+        foodCost: acc.foodCost + r.foodCost,
+        wasteValue: acc.wasteValue + r.wasteValue,
+        purchaseTotal: acc.purchaseTotal + r.purchaseTotal,
+        portions: acc.portions + r.portions,
+      }),
+      { revenue: 0, foodCost: 0, wasteValue: 0, purchaseTotal: 0, portions: 0 },
+    );
+
+    return {
+      data: rows,
+      totals: {
+        ...totals,
+        foodCostPercentage: totals.revenue > 0 ? Math.round((totals.foodCost / totals.revenue) * 10000) / 100 : 0,
+      },
+      period: { from, to },
+    };
+  }
+
   async foodCostReport() {
     const recipes = await this.prisma.recipe.findMany({
       where: { isActive: true },

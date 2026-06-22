@@ -1,8 +1,10 @@
 'use client';
 
 import { useRouter } from 'next/navigation';
-import { LogOut, User } from 'lucide-react';
+import { LogOut } from 'lucide-react';
 import { useAuthStore } from '@/stores/auth-store';
+import { useBranchStore } from '@/stores/branch-store';
+import { BranchSwitcher } from './branch-switcher';
 import { MobileSidebar } from './sidebar';
 import { Avatar, AvatarFallback } from '@/components/ui/avatar';
 import {
@@ -15,9 +17,11 @@ import { NotificationBell } from './notification-bell';
 export function Header() {
   const router = useRouter();
   const { user, logout } = useAuthStore();
+  const resetBranches = useBranchStore((s) => s.reset);
 
   const handleLogout = () => {
     logout();
+    resetBranches();
     router.push('/login');
   };
 
@@ -29,6 +33,7 @@ export function Header() {
     <header className="sticky top-0 z-40 flex h-14 items-center gap-4 border-b bg-background px-4 lg:px-6">
       <MobileSidebar />
       <div className="flex-1" />
+      <BranchSwitcher />
       <NotificationBell />
       <DropdownMenu>
         <DropdownMenuTrigger asChild>

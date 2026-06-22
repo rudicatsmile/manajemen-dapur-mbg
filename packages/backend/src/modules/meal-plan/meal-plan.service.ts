@@ -6,6 +6,7 @@ import {
 } from '@nestjs/common';
 import { PrismaService } from '../../prisma/prisma.service';
 import { generateDocNumber } from '../../common/helpers/doc-number.helper';
+import { getBranchStockQty } from '../../common/helpers/stock.helper';
 
 const DAY_NAMES = ['Minggu', 'Senin', 'Selasa', 'Rabu', 'Kamis', 'Jumat', 'Sabtu'] as const;
 const DEFAULT_LEAD_TIME = 3;
@@ -250,7 +251,17 @@ export class MealPlanService {
     });
   }
 
-  async stockCheck(id: number): Promise<StockCheckResult[]> {
+  /** Stok untuk cek meal plan: cabang spesifik atau agregat semua cabang (mode ALL). */
+  private async planStock(branchId: number | null, itemId: number): Promise<number> {
+    if (branchId) return getBranchStockQty(this.prisma, branchId, itemId);
+    const agg = await this.prisma.branchStock.aggregate({
+      where: { itemId },
+      _sum: { currentStock: true },
+    });
+    return Number(agg._sum.currentStock ?? 0);
+  }
+
+  async stockCheck(branchId: number | null, id: number): Promise<StockCheckResult[]> {
     const plan = await this.prisma.mealPlan.findUnique({
       where: { id },
       include: {
@@ -307,7 +318,7 @@ export class MealPlanService {
     const results: StockCheckResult[] = [];
     for (const [itemId, data] of itemNeeds) {
       const totalNeeded = Math.round(data.totalNeeded * 1000) / 1000;
-      const currentStock = data.item.currentStock;
+      const currentStock = await this.planStock(branchId, itemId);
       const diff = currentStock - totalNeeded;
       results.push({
         itemId,
@@ -327,8 +338,8 @@ export class MealPlanService {
     return results;
   }
 
-  async generateShoppingList(id: number, userId: number): Promise<{ poIds: number[] }> {
-    const stockResults = await this.stockCheck(id);
+  async generateShoppingList(branchId: number, id: number, userId: number): Promise<{ poIds: number[] }> {
+    const stockResults = await this.stockCheck(branchId, id);
     const deficitItems = stockResults.filter(r => r.deficit > 0);
 
     if (deficitItems.length === 0) {
@@ -398,6 +409,7 @@ export class MealPlanService {
       const po = await this.prisma.purchaseOrder.create({
         data: {
           poNumber,
+          branchId,
           supplierId,
           poDate: new Date(),
           expectedDate: new Date(Date.now() + DEFAULT_LEAD_TIME * 24 * 60 * 60 * 1000),

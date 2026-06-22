@@ -165,18 +165,23 @@ Tracking batch dan tanggal kadaluarsa per item:
 ---
 
 ### 8. Multi-Cabang & Transfer Stok
-**Status**: Planned (data model sudah disiapkan)
+**Status**: ✅ Selesai (Fase 1–3)
 **Estimasi**: 6 minggu
 
 **Fitur detail**:
-- Entity Branch (cabang) dengan master data independen atau shared
-- Setiap transaksi terikat ke satu cabang
-- Transfer stok antar cabang (request → approve → kirim → terima)
-- Dashboard per cabang + dashboard konsolidasi owner
-- User bisa di-assign ke satu atau lebih cabang
-- Perbandingan performa antar cabang (food cost, waste, revenue)
+- ✅ Entity Branch (cabang) — master data **shared**, stok per-cabang via `BranchStock`
+- ✅ Setiap transaksi terikat ke satu cabang (PO, Receiving, Production, Waste, Opname, StockMovement, ItemBatch)
+- ✅ User di-assign ke satu/lebih cabang (`UserBranch`) + branch switcher global di header (`X-Branch-Id`)
+- ✅ Dashboard & semua list/stok ter-scope ke cabang aktif; mode "Semua Cabang" (konsolidasi) untuk Owner/Admin
+- ✅ Transfer stok antar cabang (request → approve → kirim → terima) dengan mutasi `TRF_OUT`/`TRF_IN` — **Fase 2**
+- ✅ Laporan Perbandingan Cabang (revenue, food cost %, waste, pembelian) + PDF — **Fase 3** (`GET /reports/branch-comparison`, halaman `laporan/perbandingan-cabang`)
 
 **Impact**: Siap scale bisnis ke banyak lokasi.
+
+**Catatan implementasi**:
+- Stok riil per-cabang ada di `BranchStock` (sumber kebenaran). `Item.currentStock/minStock` kini hanya default template.
+- Mutasi stok terpusat lewat helper `adjustBranchStock` (`common/helpers/stock.helper.ts`).
+- Akses cabang divalidasi `BranchAccessGuard` + `@CurrentBranch()`; Owner bebas akses semua, role lain wajib anggota.
 
 ---
 

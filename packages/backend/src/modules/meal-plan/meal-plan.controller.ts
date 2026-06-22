@@ -12,12 +12,15 @@ import {
 } from '@nestjs/common';
 import { JwtAuthGuard } from '../../common/guards/jwt-auth.guard';
 import { RolesGuard } from '../../common/guards/roles.guard';
+import { BranchAccessGuard } from '../../common/guards/branch-access.guard';
 import { Roles } from '../../common/decorators/roles.decorator';
 import { CurrentUser } from '../../common/decorators/current-user.decorator';
+import { CurrentBranch, type BranchContext } from '../../common/decorators/current-branch.decorator';
+import { BadRequestException } from '@nestjs/common';
 import { MealPlanService } from './meal-plan.service';
 
 @Controller('meal-plans')
-@UseGuards(JwtAuthGuard, RolesGuard)
+@UseGuards(JwtAuthGuard, RolesGuard, BranchAccessGuard)
 @Roles('OWNER', 'ADMIN', 'PURCHASER', 'KITCHEN_MANAGER')
 export class MealPlanController {
   constructor(private readonly mealPlanService: MealPlanService) {}
@@ -131,15 +134,17 @@ export class MealPlanController {
   }
 
   @Get(':id/stock-check')
-  stockCheck(@Param('id', ParseIntPipe) id: number) {
-    return this.mealPlanService.stockCheck(id);
+  stockCheck(@Param('id', ParseIntPipe) id: number, @CurrentBranch() branch: BranchContext) {
+    return this.mealPlanService.stockCheck(branch.branchId, id);
   }
 
   @Post(':id/generate-shopping-list')
   generateShoppingList(
     @Param('id', ParseIntPipe) id: number,
+    @CurrentBranch() branch: BranchContext,
     @CurrentUser() user: { id: number },
   ) {
-    return this.mealPlanService.generateShoppingList(id, user.id);
+    if (!branch.branchId) throw new BadRequestException('Pilih cabang spesifik untuk generate shopping list');
+    return this.mealPlanService.generateShoppingList(branch.branchId, id, user.id);
   }
 }

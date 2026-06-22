@@ -111,21 +111,26 @@ export class NotificationService {
   }
 
   async checkLowStock() {
-    const lowStockItems = await this.prisma.item.findMany({
+    // Stok rendah dievaluasi per-cabang (BranchStock), bukan stok global item.
+    const lowStocks = await this.prisma.branchStock.findMany({
       where: {
-        isActive: true,
         minStock: { gt: 0 },
+        item: { isActive: true },
+      },
+      include: {
+        item: { select: { name: true, sku: true } },
+        branch: { select: { name: true } },
       },
     });
 
     let count = 0;
-    for (const item of lowStockItems) {
-      if (Number(item.currentStock) > Number(item.minStock)) continue;
+    for (const bs of lowStocks) {
+      if (Number(bs.currentStock) > Number(bs.minStock)) continue;
 
-      const title = `Stok Rendah: ${item.name}`;
+      const title = `Stok Rendah: ${bs.item.name} (${bs.branch.name})`;
       if (await this.alreadyNotifiedToday('LOW_STOCK', title)) continue;
 
-      const message = `Stok ${item.name} (${item.sku}) saat ini ${Number(item.currentStock)}, di bawah minimum ${Number(item.minStock)}.`;
+      const message = `Stok ${bs.item.name} (${bs.item.sku}) di ${bs.branch.name} saat ini ${Number(bs.currentStock)}, di bawah minimum ${Number(bs.minStock)}.`;
       for (const role of ['PURCHASER', 'ADMIN']) {
         await this.createForRole(role, 'LOW_STOCK', title, message, '/stok/item');
       }

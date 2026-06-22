@@ -6,11 +6,12 @@ import { Decimal } from '@prisma/client/runtime/library';
 export class DashboardService {
   constructor(private prisma: PrismaService) {}
 
-  async summary() {
+  async summary(branchId: number | null) {
     const today = new Date();
     today.setHours(0, 0, 0, 0);
     const tomorrow = new Date(today);
     tomorrow.setDate(tomorrow.getDate() + 1);
+    const branchFilter = branchId ? { branchId } : {};
 
     const [todayPurchases, lowStockCount, todayProductions, todayWaste, pendingPO] =
       await Promise.all([
@@ -19,20 +20,23 @@ export class DashboardService {
           where: {
             poDate: { gte: today, lt: tomorrow },
             status: { not: 'CANCELLED' },
+            ...branchFilter,
           },
         }),
         this.prisma.$queryRaw<[{ count: bigint }]>`
-          SELECT COUNT(*) as count FROM items
-          WHERE is_active = true AND current_stock <= min_stock
+          SELECT COUNT(*) as count FROM branch_stocks bs
+          JOIN items i ON bs.item_id = i.id
+          WHERE i.is_active = true AND bs.current_stock <= bs.min_stock
+            AND (${branchId} IS NULL OR bs.branch_id = ${branchId})
         `,
         this.prisma.production.count({
-          where: { productionDate: { gte: today, lt: tomorrow } },
+          where: { productionDate: { gte: today, lt: tomorrow }, ...branchFilter },
         }),
         this.prisma.wasteRecord.count({
-          where: { wasteDate: { gte: today, lt: tomorrow } },
+          where: { wasteDate: { gte: today, lt: tomorrow }, ...branchFilter },
         }),
         this.prisma.purchaseOrder.count({
-          where: { status: { in: ['DRAFT', 'PENDING_APPROVAL'] } },
+          where: { status: { in: ['DRAFT', 'PENDING_APPROVAL'] }, ...branchFilter },
         }),
       ]);
 
@@ -45,7 +49,7 @@ export class DashboardService {
     };
   }
 
-  async purchaseTrend() {
+  async purchaseTrend(branchId: number | null) {
     const thirtyDaysAgo = new Date();
     thirtyDaysAgo.setDate(thirtyDaysAgo.getDate() - 30);
 
@@ -53,6 +57,7 @@ export class DashboardService {
       SELECT DATE(po_date) as date, SUM(total_amount) as total
       FROM purchase_orders
       WHERE po_date >= ${thirtyDaysAgo} AND status != 'CANCELLED'
+        AND (${branchId} IS NULL OR branch_id = ${branchId})
       GROUP BY DATE(po_date)
       ORDER BY date ASC
     `;
@@ -60,7 +65,7 @@ export class DashboardService {
     return data;
   }
 
-  async topItems() {
+  async topItems(branchId: number | null) {
     const data = await this.prisma.$queryRaw<any[]>`
       SELECT i.id, i.name, i.sku, SUM(poi.total_price) as total_value,
              SUM(poi.quantity) as total_quantity
@@ -68,6 +73,7 @@ export class DashboardService {
       JOIN items i ON poi.item_id = i.id
       JOIN purchase_orders po ON poi.po_id = po.id
       WHERE po.status != 'CANCELLED'
+        AND (${branchId} IS NULL OR po.branch_id = ${branchId})
       GROUP BY i.id, i.name, i.sku
       ORDER BY total_value DESC
       LIMIT 10
@@ -76,7 +82,7 @@ export class DashboardService {
     return data;
   }
 
-  async getMenuEngineering(from: string, to: string) {
+  async getMenuEngineering(from: string, to: string, branchId: number | null) {
     const fromDate = new Date(from);
     const toDate = new Date(to);
     toDate.setDate(toDate.getDate() + 1); // inclusive end date
@@ -101,6 +107,7 @@ export class DashboardService {
       where: {
         status: 'COMPLETED',
         productionDate: { gte: fromDate, lt: toDate },
+        ...(branchId ? { branchId } : {}),
       },
     });
 

@@ -37,6 +37,9 @@ export class AuthService {
     const accessToken = this.jwtService.sign(payload);
     const refreshToken = this.jwtService.sign(payload, { expiresIn: '7d' });
 
+    // Cabang yang bisa diakses user (OWNER → semua, lainnya → yang di-assign)
+    const branches = await this.getAccessibleBranches(user.id, user.role);
+
     return {
       accessToken,
       refreshToken,
@@ -45,8 +48,23 @@ export class AuthService {
         email: user.email,
         name: user.name,
         role: user.role,
+        defaultBranchId: user.defaultBranchId ?? branches[0]?.id ?? null,
+        branches,
       },
     };
+  }
+
+  /** Daftar cabang aktif yang dapat diakses user, untuk branch switcher. */
+  private async getAccessibleBranches(userId: number, role: string) {
+    const where =
+      role === 'OWNER'
+        ? { isActive: true }
+        : { isActive: true, members: { some: { userId } } };
+    return this.prisma.branch.findMany({
+      where,
+      select: { id: true, code: true, name: true, isDefault: true },
+      orderBy: [{ isDefault: 'desc' }, { name: 'asc' }],
+    });
   }
 
   async refresh(refreshToken: string) {

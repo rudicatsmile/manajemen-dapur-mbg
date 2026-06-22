@@ -2,17 +2,21 @@ import { Injectable, NotFoundException, BadRequestException } from '@nestjs/comm
 import { PrismaService } from '../../../prisma/prisma.service';
 import { paginate, paginationMeta } from '../../../common/helpers/pagination.helper';
 import { generateDocNumber } from '../../../common/helpers/doc-number.helper';
+import { adjustBranchStock, getBranchStockQty } from '../../../common/helpers/stock.helper';
 import { Decimal } from '@prisma/client/runtime/library';
 
 @Injectable()
 export class OpnameService {
   constructor(private prisma: PrismaService) {}
 
-  async findAll(page: number, perPage: number) {
+  async findAll(branchId: number | null, page: number, perPage: number) {
     const { skip, take } = paginate(page, perPage);
+    const where: any = {};
+    if (branchId) where.branchId = branchId;
 
     const [data, total] = await Promise.all([
       this.prisma.stockOpname.findMany({
+        where,
         skip,
         take,
         orderBy: { createdAt: 'desc' },
@@ -22,7 +26,7 @@ export class OpnameService {
           _count: { select: { items: true } },
         },
       }),
-      this.prisma.stockOpname.count(),
+      this.prisma.stockOpname.count({ where }),
     ]);
 
     return { data, meta: paginationMeta(total, page, perPage) };
@@ -41,16 +45,13 @@ export class OpnameService {
     return opname;
   }
 
-  async create(data: any, userId: number) {
+  async create(branchId: number, data: any, userId: number) {
     const opnameNumber = await generateDocNumber(this.prisma, 'SOP', 'stock_opnames', 'opname_number');
 
-    // Capture system qty at creation time
+    // Tangkap system qty dari stok cabang aktif saat opname dibuat
     const itemsData = await Promise.all(
       data.items.map(async (item: any) => {
-        const dbItem = await this.prisma.item.findUnique({ where: { id: item.itemId } });
-        if (!dbItem) throw new NotFoundException(`Item dengan ID ${item.itemId} tidak ditemukan`);
-
-        const systemQty = dbItem.currentStock;
+        const systemQty = new Decimal(await getBranchStockQty(this.prisma, branchId, item.itemId));
         const actualQty = new Decimal(item.actualQty);
         const difference = actualQty.sub(systemQty);
 
@@ -67,6 +68,7 @@ export class OpnameService {
     return this.prisma.stockOpname.create({
       data: {
         opnameNumber,
+        branchId,
         opnameDate: new Date(data.opnameDate),
         notes: data.notes || null,
         createdBy: userId,
@@ -127,33 +129,18 @@ export class OpnameService {
 
     return this.prisma.$transaction(async (tx) => {
       for (const opnameItem of opname.items) {
-        if (!new Decimal(opnameItem.difference).isZero()) {
-          const item = await tx.item.findUnique({ where: { id: opnameItem.itemId } });
-          if (!item) continue;
-
-          const qtyBefore = item.currentStock;
-          const qtyChange = new Decimal(opnameItem.difference);
-          const qtyAfter = qtyBefore.add(qtyChange);
-
-          await tx.item.update({
-            where: { id: opnameItem.itemId },
-            data: { currentStock: qtyAfter },
-          });
-
-          const movementType = qtyChange.greaterThan(0) ? 'ADJ_PLUS' : 'ADJ_MINUS';
-
-          await tx.stockMovement.create({
-            data: {
-              itemId: opnameItem.itemId,
-              movementType,
-              referenceType: 'STOCK_OPNAME',
-              referenceId: opname.id,
-              qtyBefore,
-              qtyChange,
-              qtyAfter,
-              notes: `Stock Opname ${opname.opnameNumber}`,
-              createdBy: userId,
-            },
+        const diff = new Decimal(opnameItem.difference);
+        if (!diff.isZero()) {
+          const movementType = diff.greaterThan(0) ? 'ADJ_PLUS' : 'ADJ_MINUS';
+          await adjustBranchStock(tx, {
+            branchId: opname.branchId,
+            itemId: opnameItem.itemId,
+            qtyChange: diff.toNumber(),
+            movementType,
+            referenceType: 'STOCK_OPNAME',
+            referenceId: opname.id,
+            userId,
+            notes: `Stock Opname ${opname.opnameNumber}`,
           });
         }
       }

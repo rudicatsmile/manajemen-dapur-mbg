@@ -43,9 +43,22 @@ export const MOVEMENT_TYPE = {
   ADJ_PLUS: 'ADJ_PLUS',
   ADJ_MINUS: 'ADJ_MINUS',
   WST: 'WST',
+  TRF_OUT: 'TRF_OUT',
+  TRF_IN: 'TRF_IN',
 } as const;
 
 export type MovementType = (typeof MOVEMENT_TYPE)[keyof typeof MOVEMENT_TYPE];
+
+export const TRANSFER_STATUS = {
+  REQUESTED: 'REQUESTED',
+  APPROVED: 'APPROVED',
+  REJECTED: 'REJECTED',
+  SHIPPED: 'SHIPPED',
+  RECEIVED: 'RECEIVED',
+  CANCELLED: 'CANCELLED',
+} as const;
+
+export type TransferStatus = (typeof TRANSFER_STATUS)[keyof typeof TRANSFER_STATUS];
 
 export const WASTE_CATEGORY = {
   EXPIRED: 'EXPIRED',

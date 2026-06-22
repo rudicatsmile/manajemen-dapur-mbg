@@ -50,6 +50,36 @@ async function main() {
 
   console.log('✓ 4 users created');
 
+  // ─── 1b. BRANCHES ─────────────────────────────────────────
+  const branchDefs = [
+    { code: 'PST', name: 'Cabang Pusat', address: 'Jl. Pusat No. 1, Jakarta', isDefault: true },
+    { code: 'CBG-SLT', name: 'Cabang Selatan', address: 'Jl. Selatan No. 10, Jakarta', isDefault: false },
+  ];
+  const branches: Record<string, number> = {};
+  for (const b of branchDefs) {
+    const r = await prisma.branch.upsert({
+      where: { code: b.code },
+      update: { name: b.name, address: b.address, isDefault: b.isDefault },
+      create: b,
+    });
+    branches[b.code] = r.id;
+  }
+  const branchPST = branches['PST']!;
+
+  // Set default branch + assign all users to all branches
+  for (const u of [admin, owner, purchaser, kitchen]) {
+    await prisma.user.update({ where: { id: u.id }, data: { defaultBranchId: branchPST } });
+    for (const branchId of Object.values(branches)) {
+      await prisma.userBranch.upsert({
+        where: { userId_branchId: { userId: u.id, branchId } },
+        update: {},
+        create: { userId: u.id, branchId },
+      });
+    }
+  }
+
+  console.log('✓ 2 branches + user assignments');
+
   // ─── 2. UNITS ─────────────────────────────────────────────
   const unitData = [
     { name: 'Kilogram', abbreviation: 'kg' },
@@ -180,9 +210,23 @@ async function main() {
       },
     });
     items[it.name] = r.id;
+
+    // Stok per-cabang: PST = stok penuh, CBG-SLT = ~40% (demo cabang baru, stok lebih sedikit)
+    await prisma.branchStock.upsert({
+      where: { branchId_itemId: { branchId: branchPST, itemId: r.id } },
+      update: { currentStock: d(it.currentStock), minStock: d(it.minStock) },
+      create: { branchId: branchPST, itemId: r.id, currentStock: d(it.currentStock), minStock: d(it.minStock) },
+    });
+    const sltBranch = branches['CBG-SLT']!;
+    const sltStock = Math.round(it.currentStock * 0.4 * 100) / 100;
+    await prisma.branchStock.upsert({
+      where: { branchId_itemId: { branchId: sltBranch, itemId: r.id } },
+      update: { currentStock: d(sltStock), minStock: d(it.minStock) },
+      create: { branchId: sltBranch, itemId: r.id, currentStock: d(sltStock), minStock: d(it.minStock) },
+    });
   }
 
-  console.log('✓ 25 items');
+  console.log('✓ 25 items + branch stocks (2 cabang)');
 
   // ─── 6. PURCHASE ORDERS (berbagai status) ─────────────────
 
@@ -204,6 +248,7 @@ async function main() {
     const po = await prisma.purchaseOrder.create({
       data: {
         poNumber: poNum,
+        branchId: branchPST,
         supplierId: suppliers[supplier]!,
         poDate: date,
         expectedDate: expectedDaysBack !== undefined ? daysAgo(expectedDaysBack) : null,
@@ -269,6 +314,7 @@ async function main() {
     const rcv = await prisma.receiving.create({
       data: {
         receivingNumber: rcvNum,
+        branchId: branchPST,
         poId: po.id,
         receivedDate: date,
         createdBy: purchaser.id,
@@ -296,6 +342,7 @@ async function main() {
       const qtyBefore = Number(item!.currentStock);
       await prisma.stockMovement.create({
         data: {
+          branchId: branchPST,
           itemId: items[ri.item]!,
           movementType: 'RCV',
           referenceType: 'RECEIVING',
@@ -544,6 +591,7 @@ async function main() {
     const prod = await prisma.production.create({
       data: {
         productionNumber: prodNum,
+        branchId: branchPST,
         productionDate: date,
         recipeId: recipes[pp.recipe]!,
         plannedQty: d(pp.qty),
@@ -587,6 +635,7 @@ async function main() {
   for (const w of wastes) {
     await prisma.wasteRecord.create({
       data: {
+        branchId: branchPST,
         wasteDate: daysAgo(w.days),
         itemId: items[w.item]!,
         quantity: d(w.qty),
@@ -604,6 +653,7 @@ async function main() {
   const opname = await prisma.stockOpname.create({
     data: {
       opnameNumber: formatDocNum('OPN', daysAgo(5), 1),
+      branchId: branchPST,
       opnameDate: daysAgo(5),
       status: 'APPROVED',
       approvedBy: admin.id,
@@ -876,6 +926,7 @@ async function main() {
 
     await prisma.itemBatch.create({
       data: {
+        branchId: branchPST,
         itemId,
         batchNumber: b.batch,
         expiryDate,

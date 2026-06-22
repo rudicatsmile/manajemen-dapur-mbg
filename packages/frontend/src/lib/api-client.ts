@@ -14,6 +14,10 @@ apiClient.interceptors.request.use((config) => {
     if (token) {
       config.headers.Authorization = `Bearer ${token}`;
     }
+    const activeBranch = localStorage.getItem('activeBranch');
+    if (activeBranch) {
+      config.headers['X-Branch-Id'] = activeBranch;
+    }
   }
   return config;
 });
