@@ -17,19 +17,18 @@ export class NotificationController {
     @Query('perPage') perPage?: string,
     @Query('unreadOnly') unreadOnly?: string,
   ) {
-    const result = await this.notificationService.findAllForUser(
+    return this.notificationService.findAllForUser(
       user.id,
       page ? parseInt(page, 10) : 1,
       perPage ? parseInt(perPage, 10) : 20,
       unreadOnly === 'true',
     );
-    return { data: result.data, meta: result.meta };
   }
 
   @Get('count')
   async getUnreadCount(@CurrentUser() user: { id: number }) {
     const count = await this.notificationService.getUnreadCount(user.id);
-    return { data: { count } };
+    return { count };
   }
 
   @Post(':id/read')
@@ -37,14 +36,13 @@ export class NotificationController {
     @Param('id', ParseIntPipe) id: number,
     @CurrentUser() user: { id: number },
   ) {
-    const notification = await this.notificationService.markAsRead(id, user.id);
-    return { data: notification };
+    return this.notificationService.markAsRead(id, user.id);
   }
 
   @Post('read-all')
   async markAllAsRead(@CurrentUser() user: { id: number }) {
     const result = await this.notificationService.markAllAsRead(user.id);
-    return { data: { updated: result.count } };
+    return { updated: result.count };
   }
 
   @Post('check')
@@ -55,6 +53,6 @@ export class NotificationController {
       this.notificationService.checkPendingPO(),
       this.notificationService.checkOverduePO(),
     ]);
-    return { data: { lowStock, pendingPO, overduePO } };
+    return { lowStock, pendingPO, overduePO };
   }
 }

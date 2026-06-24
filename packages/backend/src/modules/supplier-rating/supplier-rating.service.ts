@@ -278,7 +278,7 @@ export class SupplierRatingService {
 
     ratings.sort((a, b) => b.overallScore - a.overallScore);
 
-    return { data: ratings };
+    return ratings;
   }
 
   async getSupplierDetail(supplierId: number, period?: Period) {
@@ -397,18 +397,16 @@ export class SupplierRatingService {
     }));
 
     return {
-      data: {
-        supplierId: supplier.id,
-        supplierName: supplier.name,
-        category: supplier.category,
-        overallScore: currentOverall,
-        scores: current.scores,
-        totalPOs: current.totalPOs,
-        totalValue: current.totalValue,
-        trend,
-        poHistory: poHistoryList,
-        itemsSupplied,
-      },
+      supplierId: supplier.id,
+      supplierName: supplier.name,
+      category: supplier.category,
+      overallScore: currentOverall,
+      scores: current.scores,
+      totalPOs: current.totalPOs,
+      totalValue: current.totalValue,
+      trend,
+      poHistory: poHistoryList,
+      itemsSupplied,
     };
   }
 }
