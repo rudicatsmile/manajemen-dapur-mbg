@@ -4,6 +4,7 @@ import { PriceHistoryService } from '../price-history/price-history.service';
 import { BatchTrackingService } from '../batch-tracking/batch-tracking.service';
 import { paginate, paginationMeta } from '../../common/helpers/pagination.helper';
 import { generateDocNumber } from '../../common/helpers/doc-number.helper';
+import { adjustBranchStock } from '../../common/helpers/stock.helper';
 import { Decimal } from '@prisma/client/runtime/library';
 
 @Injectable()
@@ -14,9 +15,10 @@ export class ReceivingService {
     private batchTrackingService: BatchTrackingService,
   ) {}
 
-  async findAll(page: number, perPage: number, search?: string) {
+  async findAll(branchId: number | null, page: number, perPage: number, search?: string) {
     const { skip, take } = paginate(page, perPage);
     const where: any = {};
+    if (branchId) where.branchId = branchId;
     if (search) {
       where.OR = [
         { receivingNumber: { contains: search } },
@@ -71,6 +73,7 @@ export class ReceivingService {
       const receiving = await tx.receiving.create({
         data: {
           receivingNumber,
+          branchId: po.branchId,
           poId: data.poId,
           receivedDate: new Date(data.receivedDate),
           notes: data.notes || null,
@@ -101,36 +104,22 @@ export class ReceivingService {
           },
         });
 
-        // Get current item stock
-        const item = await tx.item.findUnique({ where: { id: rcvItem.itemId } });
-        if (!item) throw new BadRequestException(`Item dengan ID ${rcvItem.itemId} tidak ditemukan`);
-
-        const qtyBefore = item.currentStock;
-        const qtyChange = new Decimal(rcvItem.quantity);
-        const qtyAfter = qtyBefore.add(qtyChange);
-
-        // Update item stock and last price
+        // Update harga terakhir item (master global)
         await tx.item.update({
           where: { id: rcvItem.itemId },
-          data: {
-            currentStock: qtyAfter,
-            lastPrice: poItem.unitPrice,
-          },
+          data: { lastPrice: poItem.unitPrice },
         });
 
-        // Create stock movement
-        await tx.stockMovement.create({
-          data: {
-            itemId: rcvItem.itemId,
-            movementType: 'RCV',
-            referenceType: 'RECEIVING',
-            referenceId: receiving.id,
-            qtyBefore,
-            qtyChange,
-            qtyAfter,
-            notes: `Penerimaan ${receivingNumber}`,
-            createdBy: userId,
-          },
+        // Tambah stok cabang + catat mutasi (per-cabang sesuai cabang PO)
+        await adjustBranchStock(tx, {
+          branchId: po.branchId,
+          itemId: rcvItem.itemId,
+          qtyChange: Number(rcvItem.quantity),
+          movementType: 'RCV',
+          referenceType: 'RECEIVING',
+          referenceId: receiving.id,
+          userId,
+          notes: `Penerimaan ${receivingNumber}`,
         });
       }
 
@@ -183,6 +172,7 @@ export class ReceivingService {
         : undefined;
 
       await this.batchTrackingService.createBatch(
+        po.branchId,
         rcvItem.itemId,
         batchNumber,
         expiryDate,

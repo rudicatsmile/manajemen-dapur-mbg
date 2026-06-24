@@ -16,3 +16,11 @@ export function formatDate(date: string | Date): string {
 export function formatDateInput(date: Date): string {
   return date.toISOString().split('T')[0]!;
 }
+
+/** True bila error berasal dari kegagalan koneksi (Axios tanpa response), bukan error server. */
+export function isNetworkError(err: unknown): boolean {
+  if (typeof err !== 'object' || err === null) return false;
+  const e = err as { code?: string; response?: unknown; message?: string };
+  if (e.response) return false; // server merespons (4xx/5xx) → bukan network error
+  return e.code === 'ERR_NETWORK' || e.message === 'Network Error' || !!e.code;
+}

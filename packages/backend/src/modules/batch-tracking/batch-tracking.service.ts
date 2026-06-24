@@ -1,6 +1,7 @@
 import { Injectable, NotFoundException, BadRequestException } from '@nestjs/common';
 import { PrismaService } from '../../prisma/prisma.service';
 import { NotificationService } from '../notification/notification.service';
+import { adjustBranchStock } from '../../common/helpers/stock.helper';
 import { Decimal } from '@prisma/client/runtime/library';
 
 @Injectable()
@@ -11,6 +12,7 @@ export class BatchTrackingService {
   ) {}
 
   async createBatch(
+    branchId: number,
     itemId: number,
     batchNumber: string,
     expiryDate?: Date,
@@ -22,6 +24,7 @@ export class BatchTrackingService {
     const quantity = qty ?? 0;
     return this.prisma.itemBatch.create({
       data: {
+        branchId,
         itemId,
         batchNumber,
         expiryDate: expiryDate ?? null,
@@ -35,9 +38,9 @@ export class BatchTrackingService {
     });
   }
 
-  async getItemBatches(itemId: number) {
+  async getItemBatches(itemId: number, branchId?: number | null) {
     return this.prisma.itemBatch.findMany({
-      where: { itemId },
+      where: { itemId, ...(branchId ? { branchId } : {}) },
       orderBy: [
         { expiryDate: 'asc' },
         { receivedDate: 'asc' },
@@ -48,7 +51,7 @@ export class BatchTrackingService {
     });
   }
 
-  async getExpiringBatches(days: number = 7) {
+  async getExpiringBatches(days: number = 7, branchId?: number | null) {
     const cutoff = new Date();
     cutoff.setDate(cutoff.getDate() + days);
     cutoff.setHours(23, 59, 59, 999);
@@ -57,6 +60,7 @@ export class BatchTrackingService {
       where: {
         status: 'AVAILABLE',
         expiryDate: { not: null, lte: cutoff },
+        ...(branchId ? { branchId } : {}),
       },
       orderBy: { expiryDate: 'asc' },
       include: {
@@ -65,7 +69,8 @@ export class BatchTrackingService {
     });
   }
 
-  async getDashboard() {
+  async getDashboard(branchId?: number | null) {
+    const branchWhere = branchId ? { branchId } : {};
     const now = new Date();
     const in1Day = new Date(now);
     in1Day.setDate(in1Day.getDate() + 1);
@@ -78,17 +83,17 @@ export class BatchTrackingService {
     in7Days.setHours(23, 59, 59, 999);
 
     const [totalActiveBatches, expiredCount, expiringIn7DaysBatches, expiringIn3DaysBatches, expiringIn1DayBatches] = await Promise.all([
-      this.prisma.itemBatch.count({ where: { status: 'AVAILABLE' } }),
-      this.prisma.itemBatch.count({ where: { status: 'EXPIRED' } }),
+      this.prisma.itemBatch.count({ where: { status: 'AVAILABLE', ...branchWhere } }),
+      this.prisma.itemBatch.count({ where: { status: 'EXPIRED', ...branchWhere } }),
       this.prisma.itemBatch.findMany({
-        where: { status: 'AVAILABLE', expiryDate: { not: null, lte: in7Days } },
+        where: { status: 'AVAILABLE', expiryDate: { not: null, lte: in7Days }, ...branchWhere },
         include: { item: { select: { lastPrice: true } } },
       }),
       this.prisma.itemBatch.count({
-        where: { status: 'AVAILABLE', expiryDate: { not: null, lte: in3Days } },
+        where: { status: 'AVAILABLE', expiryDate: { not: null, lte: in3Days }, ...branchWhere },
       }),
       this.prisma.itemBatch.count({
-        where: { status: 'AVAILABLE', expiryDate: { not: null, lte: in1Day } },
+        where: { status: 'AVAILABLE', expiryDate: { not: null, lte: in1Day }, ...branchWhere },
       }),
     ]);
 
@@ -107,9 +112,9 @@ export class BatchTrackingService {
     };
   }
 
-  async getFifoSuggestion(itemId: number, qty: number) {
+  async getFifoSuggestion(itemId: number, qty: number, branchId?: number | null) {
     const batches = await this.prisma.itemBatch.findMany({
-      where: { itemId, status: 'AVAILABLE', currentQty: { gt: 0 } },
+      where: { itemId, status: 'AVAILABLE', currentQty: { gt: 0 }, ...(branchId ? { branchId } : {}) },
       orderBy: [
         { expiryDate: 'asc' },
         { receivedDate: 'asc' },
@@ -148,11 +153,11 @@ export class BatchTrackingService {
     };
   }
 
-  async deductFromBatches(itemId: number, qty: number, tx?: any) {
+  async deductFromBatches(itemId: number, qty: number, branchId?: number | null, tx?: any) {
     const db = tx ?? this.prisma;
 
     const batches = await db.itemBatch.findMany({
-      where: { itemId, status: 'AVAILABLE', currentQty: { gt: 0 } },
+      where: { itemId, status: 'AVAILABLE', currentQty: { gt: 0 }, ...(branchId ? { branchId } : {}) },
       orderBy: [
         { expiryDate: 'asc' },
         { receivedDate: 'asc' },
@@ -204,9 +209,10 @@ export class BatchTrackingService {
         data: { currentQty: new Decimal(0), status: 'EXPIRED' },
       });
 
-      // Create waste record
+      // Create waste record (cabang = cabang batch)
       const waste = await tx.wasteRecord.create({
         data: {
+          branchId: batch.branchId,
           wasteDate: new Date(),
           itemId: batch.itemId,
           quantity: new Decimal(remainingQty),
@@ -217,30 +223,16 @@ export class BatchTrackingService {
         },
       });
 
-      // Update item stock
-      const item = await tx.item.findUniqueOrThrow({ where: { id: batch.itemId } });
-      const qtyBefore = item.currentStock;
-      const qtyChange = new Decimal(remainingQty).neg();
-      const qtyAfter = qtyBefore.add(qtyChange);
-
-      await tx.item.update({
-        where: { id: batch.itemId },
-        data: { currentStock: qtyAfter.lessThan(0) ? new Decimal(0) : qtyAfter },
-      });
-
-      // Create stock movement
-      await tx.stockMovement.create({
-        data: {
-          itemId: batch.itemId,
-          movementType: 'WST',
-          referenceType: 'WASTE',
-          referenceId: waste.id,
-          qtyBefore,
-          qtyChange,
-          qtyAfter: qtyAfter.lessThan(0) ? new Decimal(0) : qtyAfter,
-          notes: `Expired batch: ${batch.batchNumber}`,
-          createdBy: userId,
-        },
+      // Kurangi stok cabang + catat mutasi
+      await adjustBranchStock(tx, {
+        branchId: batch.branchId,
+        itemId: batch.itemId,
+        qtyChange: -remainingQty,
+        movementType: 'WST',
+        referenceType: 'WASTE',
+        referenceId: waste.id,
+        userId,
+        notes: `Expired batch: ${batch.batchNumber}`,
       });
 
       return { batch: { id: batchId, batchNumber: batch.batchNumber }, waste };
@@ -326,6 +318,7 @@ export class BatchTrackingService {
 
         const waste = await tx.wasteRecord.create({
           data: {
+            branchId: batch.branchId,
             wasteDate: new Date(),
             itemId: batch.itemId,
             quantity: new Decimal(remainingQty),
@@ -336,28 +329,15 @@ export class BatchTrackingService {
           },
         });
 
-        const item = await tx.item.findUniqueOrThrow({ where: { id: batch.itemId } });
-        const qtyBefore = item.currentStock;
-        const qtyChange = new Decimal(remainingQty).neg();
-        const qtyAfter = qtyBefore.add(qtyChange);
-
-        await tx.item.update({
-          where: { id: batch.itemId },
-          data: { currentStock: qtyAfter.lessThan(0) ? new Decimal(0) : qtyAfter },
-        });
-
-        await tx.stockMovement.create({
-          data: {
-            itemId: batch.itemId,
-            movementType: 'WST',
-            referenceType: 'WASTE',
-            referenceId: waste.id,
-            qtyBefore,
-            qtyChange,
-            qtyAfter: qtyAfter.lessThan(0) ? new Decimal(0) : qtyAfter,
-            notes: `Auto-expired batch: ${batch.batchNumber}`,
-            createdBy: 1,
-          },
+        await adjustBranchStock(tx, {
+          branchId: batch.branchId,
+          itemId: batch.itemId,
+          qtyChange: -remainingQty,
+          movementType: 'WST',
+          referenceType: 'WASTE',
+          referenceId: waste.id,
+          userId: 1,
+          notes: `Auto-expired batch: ${batch.batchNumber}`,
         });
       });
 

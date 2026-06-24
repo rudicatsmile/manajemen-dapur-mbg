@@ -165,18 +165,23 @@ Tracking batch dan tanggal kadaluarsa per item:
 ---
 
 ### 8. Multi-Cabang & Transfer Stok
-**Status**: Planned (data model sudah disiapkan)
+**Status**: ✅ Selesai (Fase 1–3)
 **Estimasi**: 6 minggu
 
 **Fitur detail**:
-- Entity Branch (cabang) dengan master data independen atau shared
-- Setiap transaksi terikat ke satu cabang
-- Transfer stok antar cabang (request → approve → kirim → terima)
-- Dashboard per cabang + dashboard konsolidasi owner
-- User bisa di-assign ke satu atau lebih cabang
-- Perbandingan performa antar cabang (food cost, waste, revenue)
+- ✅ Entity Branch (cabang) — master data **shared**, stok per-cabang via `BranchStock`
+- ✅ Setiap transaksi terikat ke satu cabang (PO, Receiving, Production, Waste, Opname, StockMovement, ItemBatch)
+- ✅ User di-assign ke satu/lebih cabang (`UserBranch`) + branch switcher global di header (`X-Branch-Id`)
+- ✅ Dashboard & semua list/stok ter-scope ke cabang aktif; mode "Semua Cabang" (konsolidasi) untuk Owner/Admin
+- ✅ Transfer stok antar cabang (request → approve → kirim → terima) dengan mutasi `TRF_OUT`/`TRF_IN` — **Fase 2**
+- ✅ Laporan Perbandingan Cabang (revenue, food cost %, waste, pembelian) + PDF — **Fase 3** (`GET /reports/branch-comparison`, halaman `laporan/perbandingan-cabang`)
 
 **Impact**: Siap scale bisnis ke banyak lokasi.
+
+**Catatan implementasi**:
+- Stok riil per-cabang ada di `BranchStock` (sumber kebenaran). `Item.currentStock/minStock` kini hanya default template.
+- Mutasi stok terpusat lewat helper `adjustBranchStock` (`common/helpers/stock.helper.ts`).
+- Akses cabang divalidasi `BranchAccessGuard` + `@CurrentBranch()`; Owner bebas akses semua, role lain wajib anggota.
 
 ---
 
@@ -219,40 +224,54 @@ Rekomendasi otomatis untuk optimasi biaya:
 ---
 
 ### 11. Vendor Portal
-**Status**: Future
+**Status**: ✅ Selesai (Fase 1–3)
 **Estimasi**: 8-10 minggu
 
 Portal self-service untuk supplier:
 
 **Fitur detail**:
-- Login terpisah untuk supplier
-- Supplier bisa lihat PO yang ditujukan ke mereka
-- Supplier konfirmasi/update status pengiriman
-- Supplier upload invoice/nota langsung
-- Katalog harga: supplier update harga bahan secara berkala
-- Chat/messaging antara purchaser dan supplier
+- ✅ Login terpisah untuk supplier (`SupplierUser`, strategy `supplier-jwt` independen)
+- ✅ Provisioning akun supplier oleh OWNER/ADMIN dari detail supplier internal
+- ✅ Supplier bisa lihat PO yang ditujukan ke mereka (scoped by `supplierId` token, cross-supplier → 403)
+- ✅ Supplier konfirmasi/update status pengiriman (ACKNOWLEDGED → PREPARING → SHIPPED → DELIVERED) — informasional, independen dari status PO internal
+- ✅ Supplier upload invoice/nota langsung (multer `FileInterceptor`, `source=SUPPLIER`); muncul di daftar invoice internal dengan badge "Dari Supplier"
+- ✅ Katalog harga: supplier update harga bahan secara berkala; harga lama otomatis di-nonaktifkan
+- ✅ Chat/messaging per-supplier antara purchaser dan supplier (polling 15 detik, read-tracking dua arah)
 
 **Impact**: Procurement fully paperless, komunikasi terpusat.
+
+**Catatan implementasi**:
+- Auth supplier sepenuhnya terpisah (`SupplierUser` + `supplier-jwt` strategy); token di localStorage key berbeda sehingga sesi internal & supplier bisa berdampingan.
+- Route frontend portal di `(portal)/portal/*`; API portal di `POST/GET /portal/*` (guard `SupplierJwtGuard`).
+- Upload file nyata via multer (`common/helpers/upload.helper.ts`); fix juga bug lama di invoice internal yang tidak menyimpan file.
+- `PurchaseInvoice.createdBy` dinullable-kan agar invoice dari supplier (tanpa user internal) bisa tersimpan.
+- Shipment status independen (`PurchaseOrder.shipmentStatus` + riwayat `PoShipmentUpdate`); tidak mengubah status PO internal.
 
 ---
 
 ### 12. Progressive Web App (PWA) + Barcode
-**Status**: Future
+**Status**: ✅ Selesai (Fase 1–3)
 **Estimasi**: 6-8 minggu
 
 Mobile app yang bisa diinstall tanpa app store:
 
 **Fitur detail**:
-- PWA (installable, splash screen, app icon)
-- Offline-capable untuk input produksi & opname di dapur tanpa WiFi stabil
-- Kamera barcode/QR scanner untuk:
-  - Receiving: scan barcode barang → auto-fill item
-  - Opname: scan barcode → langsung input qty fisik
-  - Item lookup: scan → lihat stok & histori
-- Push notification native ke HP
-- Background sync saat kembali online
+- ✅ PWA installable (manifest + ikon + service worker, `display: standalone`)
+- ✅ Offline-capable untuk input produksi & opname (outbox IndexedDB + background sync)
+- ✅ Kamera barcode/QR scanner (html5-qrcode + fallback input manual) untuk:
+  - ✅ Receiving: scan barcode → fokus baris item PO untuk isi qty
+  - ✅ Opname: scan barcode → otomatis tambah baris item, tinggal isi qty fisik
+  - ✅ Item lookup: scan → lihat stok cabang aktif & mutasi terakhir
+- ⏸️ Push notification native ke HP — **DITUNDA** (future; tetap pakai notifikasi in-app yang sudah ada). Web Push butuh kunci VAPID + HTTPS.
+- ✅ Background sync saat kembali online (replay outbox; fallback listener `online` untuk iOS Safari)
 
 **Impact**: Input data di lapangan tanpa laptop, akurasi naik.
+
+**Catatan implementasi**:
+- Field `Item.barcode` (unique) baru; lookup `GET /items/lookup?code=` cocokkan **barcode ATAU SKU**, branch-scoped.
+- Service worker vanilla di `public/sw.js` (tanpa build-plugin) → aman untuk Turbopack & Webpack; registrasi production-only agar tidak ganggu HMR.
+- Outbox `lib/offline-outbox.ts` menyimpan request POST saat offline; `SyncManager` me-replay saat online / pesan SW; entry dihapus hanya setelah HTTP 2xx.
+- Kamera & service worker hanya jalan di secure context (HTTPS / localhost).
 
 ---
 

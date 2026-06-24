@@ -4,6 +4,8 @@ import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import apiClient from '@/lib/api-client';
 import { toast } from 'sonner';
 import type { CreateOpnameInput } from '@mbg/shared';
+import { enqueue } from '@/lib/offline-outbox';
+import { isNetworkError } from '@/lib/utils';
 
 const QUERY_KEY = ['opnames'] as const;
 
@@ -32,12 +34,30 @@ export function useCreateOpname() {
   const qc = useQueryClient();
   return useMutation({
     mutationFn: async (data: CreateOpnameInput) => {
-      const res = await apiClient.post('/stock/opnames', data);
-      return res.data;
+      // Offline → simpan ke outbox untuk dikirim saat online
+      if (typeof navigator !== 'undefined' && !navigator.onLine) {
+        await enqueue({ path: '/stock/opnames', body: data, label: 'Stok Opname' });
+        return { offline: true };
+      }
+      try {
+        const res = await apiClient.post('/stock/opnames', data);
+        return res.data;
+      } catch (err) {
+        // Gagal koneksi saat submit → fallback ke outbox
+        if (isNetworkError(err)) {
+          await enqueue({ path: '/stock/opnames', body: data, label: 'Stok Opname' });
+          return { offline: true };
+        }
+        throw err;
+      }
     },
-    onSuccess: () => {
+    onSuccess: (result) => {
       qc.invalidateQueries({ queryKey: QUERY_KEY });
-      toast.success('Stok opname berhasil dibuat');
+      if (result?.offline) {
+        toast.success('Disimpan offline — akan dikirim otomatis saat online');
+      } else {
+        toast.success('Stok opname berhasil dibuat');
+      }
     },
   });
 }

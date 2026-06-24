@@ -7,6 +7,7 @@ import { Plus } from 'lucide-react';
 import { PageHeader } from '@/components/layout/page-header';
 import { DataTable } from '@/components/shared/data-table';
 import { StatusBadge } from '@/components/shared/status-badge';
+import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { useInvoiceList } from '@/hooks/queries/use-invoices';
 import { formatRupiah, formatDate } from '@/lib/utils';
@@ -18,6 +19,7 @@ interface Invoice {
   amount: number;
   invoiceDate: string;
   status: string;
+  source?: string;
 }
 
 const columns: ColumnDef<Invoice>[] = [
@@ -26,6 +28,14 @@ const columns: ColumnDef<Invoice>[] = [
   { accessorKey: 'amount', header: 'Jumlah', cell: ({ row }) => formatRupiah(row.original.amount) },
   { accessorKey: 'invoiceDate', header: 'Tanggal', cell: ({ row }) => formatDate(row.original.invoiceDate) },
   { accessorKey: 'status', header: 'Status', cell: ({ row }) => <StatusBadge status={row.original.status} /> },
+  {
+    accessorKey: 'source',
+    header: 'Sumber',
+    cell: ({ row }) =>
+      row.original.source === 'SUPPLIER'
+        ? <Badge variant="outline" className="text-xs">Dari Supplier</Badge>
+        : <span className="text-xs text-muted-foreground">Internal</span>,
+  },
 ];
 
 export default function InvoiceListPage() {

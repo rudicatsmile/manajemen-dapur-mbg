@@ -84,6 +84,44 @@
    - 7.10 [Input Batch Saat Receiving](#710-input-batch-saat-receiving)
    - 7.11 [Tips & Best Practices](#711-tips--best-practices)
    - 7.12 [FAQ FIFO & Expiry](#712-faq-fifo--expiry)
+8. [Multi-Cabang & Transfer Stok](#8-multi-cabang--transfer-stok)
+   - 8.1 [Tentang Multi-Cabang](#81-tentang-multi-cabang)
+   - 8.2 [Konsep: Master Shared & Stok Per-Cabang](#82-konsep-master-shared--stok-per-cabang)
+   - 8.3 [Branch Switcher — Memilih Cabang Aktif](#83-branch-switcher--memilih-cabang-aktif)
+   - 8.4 [Mode "Semua Cabang" (Konsolidasi)](#84-mode-semua-cabang-konsolidasi)
+   - 8.5 [Mengelola Cabang](#85-mengelola-cabang)
+   - 8.6 [Menempatkan Pengguna ke Cabang](#86-menempatkan-pengguna-ke-cabang)
+   - 8.7 [Bagaimana Transaksi Terikat Cabang](#87-bagaimana-transaksi-terikat-cabang)
+   - 8.8 [Transfer Stok — Alur Lengkap](#88-transfer-stok--alur-lengkap)
+   - 8.9 [Membuat Permintaan Transfer](#89-membuat-permintaan-transfer)
+   - 8.10 [Menyetujui, Menolak, Membatalkan](#810-menyetujui-menolak-membatalkan)
+   - 8.11 [Mengirim & Menerima Transfer](#811-mengirim--menerima-transfer)
+   - 8.12 [Laporan Perbandingan Cabang](#812-laporan-perbandingan-cabang)
+   - 8.13 [Tips & Best Practices](#813-tips--best-practices)
+   - 8.14 [FAQ Multi-Cabang](#814-faq-multi-cabang)
+9. [Vendor Portal](#9-vendor-portal)
+   - 9.1 [Tentang Vendor Portal](#91-tentang-vendor-portal)
+   - 9.2 [Akun Supplier — Provisioning & Login](#92-akun-supplier--provisioning--login)
+   - 9.3 [Portal: Dashboard](#93-portal-dashboard)
+   - 9.4 [Portal: Melihat Purchase Order](#94-portal-melihat-purchase-order)
+   - 9.5 [Portal: Update Status Pengiriman](#95-portal-update-status-pengiriman)
+   - 9.6 [Portal: Upload Invoice / Nota](#96-portal-upload-invoice--nota)
+   - 9.7 [Portal: Katalog Harga](#97-portal-katalog-harga)
+   - 9.8 [Portal: Chat / Pesan](#98-portal-chat--pesan)
+   - 9.9 [Internal: Melihat Data dari Supplier](#99-internal-melihat-data-dari-supplier)
+   - 9.10 [Tips & Best Practices](#910-tips--best-practices)
+   - 9.11 [FAQ Vendor Portal](#911-faq-vendor-portal)
+10. [PWA & Barcode Scanner](#10-pwa--barcode-scanner)
+    - 10.1 [Tentang PWA & Barcode](#101-tentang-pwa--barcode)
+    - 10.2 [Menginstall Aplikasi ke HP](#102-menginstall-aplikasi-ke-hp)
+    - 10.3 [Mode Offline](#103-mode-offline)
+    - 10.4 [Input Offline & Sinkronisasi Otomatis](#104-input-offline--sinkronisasi-otomatis)
+    - 10.5 [Mengisi Barcode Item](#105-mengisi-barcode-item)
+    - 10.6 [Scan Item (Lihat Stok & Histori)](#106-scan-item-lihat-stok--histori)
+    - 10.7 [Scan saat Stok Opname](#107-scan-saat-stok-opname)
+    - 10.8 [Scan saat Penerimaan Barang](#108-scan-saat-penerimaan-barang)
+    - 10.9 [Tips & Best Practices](#109-tips--best-practices)
+    - 10.10 [FAQ PWA & Barcode](#1010-faq-pwa--barcode)
 
 ---
 
@@ -2068,6 +2106,484 @@ A: Alert muncul di notification bell (in-app). Integrasi WhatsApp untuk alert ex
 
 ---
 
+## 8. Multi-Cabang & Transfer Stok
+
+### 8.1 Tentang Multi-Cabang
+
+Fitur **Multi-Cabang** membuat aplikasi siap dipakai oleh bisnis yang beroperasi di **lebih dari satu lokasi dapur**. Setiap cabang punya stok sendiri, transaksinya sendiri, dan dashboard-nya sendiri — sementara data master (item, resep, supplier, kategori, satuan) tetap **dipakai bersama** seluruh cabang.
+
+**Yang bisa dilakukan:**
+- Membuat dan mengelola banyak cabang
+- Menempatkan setiap pengguna ke satu atau beberapa cabang
+- Memisahkan stok, pembelian, produksi, waste, dan opname per cabang
+- Memindahkan stok antar cabang lewat alur **Transfer Stok** yang terkontrol
+- Membandingkan performa antar cabang (revenue, food cost, waste, pembelian)
+
+**Siapa yang memakai:**
+- **Owner** — akses semua cabang + view konsolidasi "Semua Cabang"
+- **Admin** — mengelola cabang, penempatan user, dan persetujuan
+- **Purchaser / Kitchen Manager** — bekerja di cabang yang ditugaskan kepadanya
+
+### 8.2 Konsep: Master Shared & Stok Per-Cabang
+
+Penting untuk memahami pemisahan ini:
+
+| Jenis Data | Lingkup | Penjelasan |
+|------------|---------|-----------|
+| Item, Resep, Supplier, Kategori, Satuan | **Shared (global)** | Satu katalog dipakai semua cabang. Menambah item baru otomatis tersedia di semua cabang. |
+| **Stok** (jumlah & minimum) | **Per-cabang** | Setiap cabang punya angka stok sendiri untuk tiap item. Stok Ayam di Pusat tidak sama dengan di Selatan. |
+| PO, Penerimaan, Produksi, Waste, Opname, Mutasi, Batch | **Per-cabang** | Setiap transaksi tercatat pada satu cabang. |
+
+> **Catatan:** Karena master item shared, harga terakhir (last price) sebuah item bersifat global. Yang per-cabang adalah **jumlah stok**, bukan identitas item.
+
+### 8.3 Branch Switcher — Memilih Cabang Aktif
+
+Di **header (kanan atas)**, ada dropdown **pemilih cabang** (ikon gedung). Cabang yang dipilih di sini menjadi **cabang aktif** — semua halaman (stok, PO, produksi, dashboard, dst.) otomatis menampilkan data cabang tersebut.
+
+**Cara kerja:**
+1. Klik dropdown cabang di header
+2. Pilih cabang (mis. "Cabang Selatan")
+3. Seluruh data di layar langsung berganti mengikuti cabang itu
+4. Pilihan tersimpan — saat login berikutnya, cabang terakhir tetap aktif
+
+> Jika akun Anda hanya ditempatkan di **satu cabang**, switcher otomatis terkunci ke cabang itu.
+
+### 8.4 Mode "Semua Cabang" (Konsolidasi)
+
+Khusus **Owner dan Admin**, dropdown punya opsi tambahan **"Semua Cabang"**. Saat dipilih:
+- Dashboard menampilkan **angka gabungan** seluruh cabang
+- Stok ditampilkan sebagai **total** lintas cabang (mis. Ayam Pusat 25 + Selatan 10 = 35)
+- Daftar transaksi menampilkan data dari semua cabang
+
+Mode ini untuk **pandangan helikopter** pemilik bisnis. Untuk operasional harian (membuat PO, produksi, transfer), pilih **cabang spesifik** — beberapa aksi tidak bisa dijalankan di mode "Semua Cabang" karena harus terikat ke satu cabang.
+
+### 8.5 Mengelola Cabang
+
+Buka **Pengaturan → Cabang** di sidebar (khusus Owner/Admin).
+
+**Menambah cabang:**
+1. Klik **"Tambah Cabang"**
+2. Isi:
+   - **Kode** — singkat & unik, huruf kapital/angka/strip (mis. `CBG-01`, `PST`)
+   - **Nama** — nama lengkap cabang (mis. "Cabang Selatan")
+   - **Alamat** dan **Telepon** (opsional)
+   - **Cabang default** — centang bila ini cabang utama (hanya satu cabang bisa default)
+3. Klik **Simpan**
+
+**Mengedit / menonaktifkan:**
+- Ikon **pensil** untuk mengubah data cabang
+- Ikon **power** untuk menonaktifkan cabang (cabang default tidak bisa dinonaktifkan). Cabang nonaktif hilang dari switcher, tapi data historisnya tetap tersimpan.
+
+Setiap baris menampilkan jumlah **anggota (user)** dan jumlah **item berstok** di cabang tersebut.
+
+### 8.6 Menempatkan Pengguna ke Cabang
+
+Pengguna hanya bisa mengakses cabang tempat ia ditugaskan (kecuali Owner yang bebas akses semua cabang).
+
+**Cara menempatkan:**
+1. Di halaman **Pengaturan → Cabang**, klik ikon **anggota** (orang) pada baris cabang
+2. Centang pengguna yang ingin ditempatkan di cabang itu
+3. Klik **Simpan**
+
+Satu pengguna bisa ditempatkan di **beberapa cabang** sekaligus — ia lalu bisa berpindah-pindah lewat branch switcher.
+
+> Saat login, sistem mengembalikan daftar cabang yang boleh diakses + cabang default user untuk mengisi switcher.
+
+### 8.7 Bagaimana Transaksi Terikat Cabang
+
+Setiap transaksi otomatis tercatat pada **cabang aktif** saat dibuat:
+
+| Transaksi | Cabang yang dipakai |
+|-----------|---------------------|
+| Purchase Order, Produksi, Waste, Stok Opname, Penyesuaian Stok | Cabang aktif di switcher |
+| Penerimaan (Receiving) | Mengikuti cabang **PO**-nya |
+| Batch (FIFO) | Mengikuti cabang penerimaannya |
+| Mutasi Stok | Cabang tempat stok berubah |
+
+Akibatnya: menerima barang di **Cabang A** hanya menambah stok di A; produksi di A hanya mengurangi stok A. Stok cabang lain tidak terpengaruh.
+
+### 8.8 Transfer Stok — Alur Lengkap
+
+Untuk memindahkan stok dari satu cabang ke cabang lain, gunakan **Stok → Transfer Stok**. Alurnya berjenjang agar terkontrol:
+
+```
+DIMINTA ──► DISETUJUI ──► DIKIRIM ──► DITERIMA
+(REQUESTED)  (APPROVED)   (SHIPPED)   (RECEIVED)
+   │             │
+   └─► DITOLAK   └─► DIBATALKAN
+     (REJECTED)    (CANCELLED)
+```
+
+- **Diminta** — permintaan dibuat (belum mempengaruhi stok)
+- **Disetujui** — Owner/Admin menyetujui (stok asal dicek cukup)
+- **Dikirim** — stok **berkurang** di cabang asal (mutasi `TRF_OUT`)
+- **Diterima** — stok **bertambah** di cabang tujuan (mutasi `TRF_IN`)
+
+Stok baru benar-benar pindah saat **Kirim** dan **Terima**, bukan saat permintaan dibuat.
+
+### 8.9 Membuat Permintaan Transfer
+
+1. Buka **Stok → Transfer Stok** → klik **"Buat Transfer"**
+2. Isi **Cabang Asal** (default: cabang aktif) dan **Cabang Tujuan** (harus berbeda)
+3. Pilih **Tanggal Permintaan**
+4. Tambahkan **item**: pilih item, isi jumlah, satuan otomatis terisi dari item
+5. Tambah catatan bila perlu, lalu klik **"Buat Permintaan"**
+
+Transfer dibuat dengan status **Diminta**, dan notifikasi terkirim ke Admin untuk persetujuan.
+
+### 8.10 Menyetujui, Menolak, Membatalkan
+
+Di **halaman detail transfer**, tombol aksi muncul sesuai status dan peran Anda:
+
+- **Setujui / Tolak** (Owner/Admin) — saat status **Diminta**. Saat menyetujui, sistem mengecek stok cabang asal cukup; bila kurang, persetujuan ditolak dengan pesan.
+- **Batalkan** — selama status masih **Diminta** atau **Disetujui** (belum dikirim).
+
+Setiap perubahan status mengirim notifikasi ke peran terkait.
+
+### 8.11 Mengirim & Menerima Transfer
+
+- **Kirim** (Owner/Admin/Kitchen Manager) — saat status **Disetujui**. Stok dikurangi dari cabang asal sesuai jumlah, status menjadi **Dikirim**, dan tercatat mutasi `TRF_OUT` di cabang asal.
+- **Terima** (Owner/Admin/Kitchen Manager) — saat status **Dikirim**. Stok ditambahkan ke cabang tujuan, status menjadi **Diterima**, dan tercatat mutasi `TRF_IN` di cabang tujuan.
+
+> **Susut perjalanan:** jumlah diterima boleh lebih kecil dari jumlah dikirim (mis. ada yang rusak di jalan). Selisihnya tidak otomatis kembali ke asal — catat terpisah bila perlu penyesuaian.
+
+Halaman detail menampilkan tabel item dengan kolom **Diminta / Dikirim / Diterima** sehingga seluruh riwayat angka transparan.
+
+### 8.12 Laporan Perbandingan Cabang
+
+Buka **Laporan → Perbandingan Cabang** (Owner/Admin). Pilih rentang tanggal, lalu sistem menampilkan tabel performa **per cabang**:
+
+| Kolom | Arti |
+|-------|------|
+| **Revenue** | Nilai produksi = jumlah porsi diproduksi × harga jual resep |
+| **Porsi** | Total porsi diproduksi pada periode |
+| **Food Cost %** | (Biaya bahan / Revenue) × 100. Berwarna **hijau** <30%, **kuning** 30–40%, **merah** >40% |
+| **Waste** | Total nilai Rupiah waste (+ jumlah kejadian) |
+| **Pembelian** | Total nilai PO (non-cancelled) |
+
+Baris **Total / Rata-rata** merangkum seluruh cabang. Klik **"Unduh PDF"** untuk mengekspor laporan (dibuat di sisi browser, format A4).
+
+### 8.13 Tips & Best Practices
+
+- **Tetapkan satu cabang default** sebagai pusat — pengguna baru dan transaksi tanpa konteks akan mengarah ke sana.
+- **Tempatkan user seperlunya.** Purchaser/Kitchen cukup di cabang operasionalnya; jangan beri akses semua cabang kecuali memang perlu.
+- **Selalu cek cabang aktif** di switcher sebelum membuat PO/produksi, agar transaksi tidak salah cabang.
+- **Pakai Transfer Stok**, jangan Penyesuaian manual, untuk memindahkan barang antar cabang — agar kedua sisi tercatat (`TRF_OUT`/`TRF_IN`) dan dapat ditelusuri.
+- **Bandingkan cabang berkala** (mingguan/bulanan) lewat laporan Perbandingan Cabang untuk menemukan cabang ber-food-cost tinggi atau waste berlebih.
+
+### 8.14 FAQ Multi-Cabang
+
+**Q: Kalau saya menambah item baru, apakah muncul di semua cabang?**
+A: Ya. Item adalah data master shared. Yang per-cabang hanya jumlah stoknya — item baru mulai dari stok 0 di setiap cabang sampai ada penerimaan/penyesuaian.
+
+**Q: Kenapa stok item berbeda saat saya ganti cabang?**
+A: Memang seharusnya begitu. Stok bersifat per-cabang. Untuk melihat total semua cabang, pilih "Semua Cabang" (Owner/Admin).
+
+**Q: Kenapa saya tidak bisa membuat PO/transfer saat memilih "Semua Cabang"?**
+A: Aksi yang membuat transaksi harus terikat ke satu cabang. Pilih cabang spesifik dulu di switcher.
+
+**Q: Apakah stok langsung pindah begitu permintaan transfer dibuat?**
+A: Tidak. Stok asal berkurang saat **Kirim**, dan stok tujuan bertambah saat **Terima**. Saat "Diminta"/"Disetujui" stok belum berubah.
+
+**Q: Bisakah transfer ke cabang yang sama?**
+A: Tidak. Cabang asal dan tujuan harus berbeda — sistem menolak permintaan cabang yang sama.
+
+**Q: Pengguna cabang A bisa melihat data cabang B?**
+A: Tidak, kecuali ia juga ditempatkan di cabang B (atau berperan Owner). Akses divalidasi setiap permintaan.
+
+**Q: Apa yang terjadi jika jumlah diterima lebih kecil dari yang dikirim?**
+A: Hanya jumlah diterima yang masuk ke stok cabang tujuan. Selisihnya dianggap susut — lakukan penyesuaian/waste terpisah bila perlu dibukukan.
+
+**Q: Cabang lama bisa dihapus?**
+A: Cabang tidak dihapus permanen, melainkan **dinonaktifkan** agar data historis (transaksi, stok, transfer) tetap utuh. Cabang default tidak bisa dinonaktifkan.
+
+---
+
+## 9. Vendor Portal
+
+### 9.1 Tentang Vendor Portal
+
+**Vendor Portal** adalah portal web terpisah yang bisa diakses oleh supplier Anda. Dengan portal ini, supplier bisa:
+- Melihat Purchase Order yang ditujukan kepada mereka
+- Mengupdate status pengiriman barang secara real-time
+- Mengirim invoice/nota pembelian secara digital
+- Memperbarui katalog harga bahan secara berkala
+- Berkomunikasi langsung dengan tim purchasing lewat chat
+
+**Manfaat utama**: Semua komunikasi dan dokumen terpusat di satu tempat, tidak lagi perlu WhatsApp/email terpisah. Procurement jadi paperless.
+
+**Konsep penting**:
+- **Auth terpisah**: Supplier punya akun login sendiri (`/portal/login`), berbeda dari login staf internal (`/login`). Keduanya bisa aktif bersamaan di browser yang sama.
+- **Status pengiriman independen**: Supplier mengupdate status pengiriman (Dikonfirmasi → Disiapkan → Dikirim → Sampai), tapi ini **tidak mengubah status PO internal**. Status PO tetap dikendalikan oleh proses Penerimaan Barang.
+- **Chat per-supplier**: Satu thread percakapan per supplier, bisa dipakai untuk semua topik.
+
+### 9.2 Akun Supplier — Provisioning & Login
+
+**Membuat akun supplier (oleh Admin/Owner):**
+1. Buka **Pembelian → Supplier → [pilih supplier] → detail**
+2. Scroll ke bagian **"Akun Portal Supplier"**
+3. Klik **"Buat Akun"** → isi nama, email, dan password awal
+4. Berikan kredensial ke supplier agar mereka bisa login di `/portal/login`
+
+**Mengelola akun**:
+- **Reset Password**: klik tombol "Reset Password" pada akun, masukkan password baru
+- **Nonaktifkan/Aktifkan**: toggle status akun; akun nonaktif tidak bisa login
+- Satu supplier bisa punya beberapa akun (misal satu untuk sales, satu untuk admin supplier)
+
+**Login supplier**:
+- Buka `http://[domain-anda]/portal/login`
+- Masukkan email dan password yang sudah diberikan oleh admin
+- Setelah login, supplier masuk ke dashboard portal
+
+### 9.3 Portal: Dashboard
+
+Halaman utama portal menampilkan kartu shortcut ke 4 fitur utama:
+- **Purchase Order** — lihat PO & update pengiriman
+- **Invoice / Nota** — kirim invoice digital
+- **Katalog Harga** — perbarui daftar harga
+- **Pesan** — chat dengan tim purchasing
+
+Dashboard juga menampilkan nama supplier dan nama kontak yang login.
+
+### 9.4 Portal: Melihat Purchase Order
+
+**Navigasi**: Portal → Purchase Order
+
+Supplier melihat daftar PO yang ditujukan khusus kepada mereka (status APPROVED, SENT, PARTIALLY_RECEIVED, COMPLETED). PO dari supplier lain tidak terlihat.
+
+**Informasi yang ditampilkan**:
+- Nomor PO, tanggal, cabang tujuan, status PO, status pengiriman, total
+- Klik detail untuk melihat daftar item (nama, qty, satuan, harga, total)
+- Filter berdasarkan status PO
+
+### 9.5 Portal: Update Status Pengiriman
+
+**Navigasi**: Portal → Purchase Order → [detail PO] → bagian "Update Status Pengiriman"
+
+Supplier bisa mengupdate status pengiriman dengan tahapan:
+1. **Dikonfirmasi** — PO diterima oleh supplier
+2. **Disiapkan** — Barang sedang disiapkan/dipacking
+3. **Dikirim** — Barang sudah dikirimkan
+4. **Terkirim ke Tujuan** — Barang sudah sampai
+
+Setiap update bisa disertai:
+- **Catatan** (opsional): info tambahan untuk purchaser
+- **Estimasi tiba / ETA** (opsional): tanggal perkiraan barang sampai
+
+**Yang terjadi saat supplier update**:
+- Status pengiriman PO di-update (terlihat di detail PO internal juga)
+- **Notifikasi otomatis** dikirim ke purchaser yang membuat PO
+- Riwayat semua update tersimpan sebagai timeline
+
+**Penting**: Update pengiriman dari supplier bersifat **informasional**. Status PO internal (Approved, Completed, dll.) tetap dikendalikan proses Penerimaan Barang.
+
+### 9.6 Portal: Upload Invoice / Nota
+
+**Navigasi**: Portal → Invoice / Nota → tombol "Kirim Invoice"
+
+Supplier bisa mengirim invoice/nota secara digital:
+1. Klik "Kirim Invoice"
+2. Isi nomor invoice, tanggal, jumlah (Rp)
+3. Lampirkan file bukti (JPEG, PNG, PDF, maks 5MB) — opsional
+4. Tambahkan catatan jika perlu
+5. Klik "Kirim Invoice"
+
+**Setelah dikirim**:
+- Invoice muncul di daftar invoice internal dengan badge **"Dari Supplier"**
+- Status awal: **PENDING** — menunggu verifikasi oleh Admin/Owner
+- Supplier bisa melihat status invoice di halaman invoice portal (PENDING, VERIFIED, REJECTED)
+- Jika invoice terkait PO, notifikasi dikirim ke purchaser yang membuat PO
+
+### 9.7 Portal: Katalog Harga
+
+**Navigasi**: Portal → Katalog Harga
+
+Supplier bisa memperbarui harga bahan yang mereka suplai:
+1. Klik **"Update Harga"**
+2. Pilih item dari daftar master item
+3. Masukkan harga baru, tanggal berlaku, dan catatan (opsional)
+4. Klik "Simpan Harga"
+
+**Mekanisme update**:
+- Saat harga baru disimpan, harga lama untuk item yang sama otomatis dinonaktifkan
+- Hanya harga aktif terbaru yang ditampilkan
+- Tim internal bisa melihat harga dari supplier di halaman detail supplier (bagian "Katalog Harga dari Supplier")
+
+### 9.8 Portal: Chat / Pesan
+
+**Navigasi**: Portal → Pesan
+
+Chat adalah satu thread percakapan per supplier (semua topik digabung):
+- Ketik pesan di kotak bawah, tekan Enter atau klik tombol kirim
+- Pesan dari supplier tampil di sisi kanan (warna biru), dari internal di sisi kiri
+- Chat otomatis di-refresh setiap 15 detik
+- Status baca (read-tracking) dua arah: pesan internal ditandai "dibaca" saat supplier membuka halaman pesan, dan sebaliknya
+
+**Dari sisi internal**: Tim purchasing/admin bisa membalas pesan supplier dari halaman detail supplier (bagian "Pesan dengan Supplier").
+
+### 9.9 Internal: Melihat Data dari Supplier
+
+Semua data yang dikirim supplier dari portal muncul di sisi internal:
+
+| Data | Lokasi di Internal |
+|------|-------------------|
+| Status pengiriman & timeline | Detail PO → bagian "Status Pengiriman Supplier" |
+| Invoice dari supplier | Pembelian → Bukti Pembelian (kolom "Sumber" = "Dari Supplier") |
+| Katalog harga | Detail Supplier → bagian "Katalog Harga dari Supplier" |
+| Chat/pesan | Detail Supplier → bagian "Pesan dengan Supplier" |
+
+### 9.10 Tips & Best Practices
+
+1. **Provisioning akun**: Buat akun supplier segera saat mulai kerjasama. Gunakan email yang benar-benar dipakai supplier.
+2. **Status pengiriman**: Minta supplier aktif mengupdate status agar tim purchasing tidak perlu menelepon untuk tracking.
+3. **Invoice digital**: Dorong supplier mengirim invoice lewat portal agar semua bukti tersimpan terpusat dan bisa diverifikasi langsung.
+4. **Katalog harga**: Minta supplier update harga sebulan sekali agar tim purchasing punya referensi saat membuat PO.
+5. **Chat**: Gunakan chat untuk komunikasi cepat. Hindari membahas hal sensitif (harga negosiasi, dll.) — gunakan fitur ini untuk koordinasi operasional.
+
+### 9.11 FAQ Vendor Portal
+
+**Q: Apakah supplier bisa melihat data internal (stok, produksi, dll)?**
+A: Tidak. Supplier hanya bisa melihat PO yang ditujukan ke mereka, invoice yang mereka kirim, harga yang mereka set, dan pesan. Tidak ada akses ke data internal lainnya.
+
+**Q: Bagaimana jika supplier lupa password?**
+A: Admin/Owner bisa melakukan "Reset Password" dari detail supplier → bagian Akun Portal Supplier.
+
+**Q: Bisakah satu supplier punya banyak akun login?**
+A: Ya. Misalnya satu akun untuk sales dan satu untuk admin supplier mereka.
+
+**Q: Apakah update pengiriman dari supplier otomatis mengubah status PO?**
+A: Tidak. Status pengiriman dari supplier bersifat informasional. Status PO internal tetap dikendalikan oleh proses Penerimaan Barang (Receiving) di sisi internal.
+
+**Q: Apakah login supplier dan login internal bisa aktif bersamaan?**
+A: Ya. Keduanya menggunakan token dan penyimpanan terpisah di browser, sehingga bisa aktif secara bersamaan.
+
+**Q: Format file apa yang bisa di-upload untuk invoice?**
+A: JPEG, PNG, WebP, dan PDF dengan ukuran maksimal 5MB.
+
+---
+
+## 10. PWA & Barcode Scanner
+
+### 10.1 Tentang PWA & Barcode
+
+**PWA (Progressive Web App)** memungkinkan aplikasi Manajemen Dapur MBG **diinstall langsung ke HP** seperti aplikasi biasa — tanpa Play Store/App Store. Setelah terinstall, aplikasi:
+- Punya ikon di layar utama HP dan berjalan layar penuh (tanpa address bar browser).
+- Bisa **dipakai offline** untuk input lapangan (produksi & opname) meski WiFi dapur tidak stabil.
+- Punya **scanner kamera barcode/QR** untuk mempercepat pencarian & input item.
+
+**Catatan penting**: Fitur kamera dan offline hanya bekerja di koneksi aman (HTTPS) atau saat akses lewat `localhost`. Di server production, pastikan aplikasi diakses lewat HTTPS.
+
+### 10.2 Menginstall Aplikasi ke HP
+
+**Android (Chrome):**
+1. Buka aplikasi di browser Chrome HP.
+2. Akan muncul banner **"Install Aplikasi"** di pojok kanan bawah — tap **Install**.
+3. (Atau lewat menu Chrome ⋮ → "Tambahkan ke layar utama".)
+4. Ikon "Dapur MBG" akan muncul di layar utama.
+
+**iOS (Safari):**
+1. Buka aplikasi di Safari.
+2. Tap tombol **Share** (kotak dengan panah ke atas).
+3. Pilih **"Add to Home Screen"**.
+
+**Desktop (Chrome/Edge):** klik ikon install di address bar, atau tombol "Install Aplikasi".
+
+### 10.3 Mode Offline
+
+Saat koneksi internet putus:
+- Muncul badge **"Mode Offline"** di bagian bawah layar.
+- Halaman yang **sudah pernah dibuka** tetap bisa diakses (data terakhir yang tersimpan).
+- Halaman yang belum pernah dibuka menampilkan halaman "Anda sedang offline".
+
+Begitu koneksi kembali, badge hilang otomatis dan data tersinkron.
+
+### 10.4 Input Offline & Sinkronisasi Otomatis
+
+Dua input lapangan bisa disimpan **meski sedang offline**:
+- **Stok Opname** (`Stok → Stok Opname → Buat Opname`)
+- **Produksi Harian** (`Produksi → Produksi Harian`)
+
+**Cara kerja**:
+1. Saat offline, isi form seperti biasa lalu **Simpan**.
+2. Muncul notifikasi **"Disimpan offline — akan dikirim otomatis saat online"**. Data masuk antrian lokal di HP.
+3. Di header muncul indikator **"N menunggu sinkron"** (N = jumlah data tertunda).
+4. Begitu koneksi kembali, aplikasi **otomatis mengirim** semua data antrian ke server. Muncul notifikasi "N data offline berhasil disinkronkan" dan indikator hilang.
+
+**Penting**:
+- Data hanya dihapus dari antrian setelah server menerima dengan sukses.
+- Jika sesi login kadaluarsa saat sinkronisasi, data tetap di antrian — login ulang lalu data akan dikirim.
+- **Penerimaan Barang (Receiving)** tetap butuh koneksi online karena memerlukan validasi PO real-time.
+
+### 10.5 Mengisi Barcode Item
+
+Agar item bisa di-scan, isi barcode-nya:
+1. Buka **Stok → Master Item → [tambah/edit item]**.
+2. Pada field **Barcode**, ketik kode barcode pabrik (EAN/UPC) atau tap tombol **scan** untuk memindainya langsung dari kemasan.
+3. Simpan.
+
+Jika item tidak punya barcode pabrik, **SKU internal** tetap bisa dipakai untuk pencarian (scan label SKU yang dicetak sendiri).
+
+### 10.6 Scan Item (Lihat Stok & Histori)
+
+**Navigasi**: Stok → **Scan Item**
+
+1. Tap tombol **Scan** → kamera terbuka.
+2. Arahkan ke barcode/QR pada barang. (Atau tap **Input Kode Manual** untuk mengetik kode.)
+3. Aplikasi menampilkan: nama item, SKU, barcode, **stok cabang aktif**, dan **5 mutasi terakhir**.
+4. Tap "Scan Lagi" untuk item berikutnya.
+
+Berguna untuk cek cepat stok & pergerakan barang langsung di gudang.
+
+### 10.7 Scan saat Stok Opname
+
+Saat membuat opname (`Stok → Stok Opname → Buat Opname`):
+1. Tap tombol **Scan Item**.
+2. Scan barang → baris item **otomatis ditambahkan** dengan item terisi.
+3. Tinggal ketik **Qty Aktual** hasil hitung fisik.
+4. Scan barang berikutnya — sangat cepat untuk opname banyak item.
+
+Jika item sudah ada di daftar, aplikasi langsung memfokus baris tersebut.
+
+### 10.8 Scan saat Penerimaan Barang
+
+Saat mencatat penerimaan (`Pembelian → Penerimaan → Buat Penerimaan`):
+1. Pilih PO terlebih dahulu (item akan terisi dari PO).
+2. Tap tombol **Scan untuk Isi**.
+3. Scan barang → aplikasi **memfokus & menggulir** ke baris item yang cocok di PO.
+4. Ketik **Qty Diterima**.
+
+Jika barang yang di-scan tidak ada di PO tersebut, muncul peringatan "Item tidak ada di PO ini".
+
+### 10.9 Tips & Best Practices
+
+1. **Install ke HP** semua staf gudang/dapur agar input bisa langsung di lapangan.
+2. **Isi barcode** untuk item yang sering diterima/diopname agar scan lebih cepat dari ketik manual.
+3. **Opname dengan scan**: pegang HP, scan-ketik qty-scan berikutnya. Jauh lebih cepat & minim salah pilih item.
+4. **Offline**: jangan ragu input saat sinyal hilang — data aman di antrian dan terkirim otomatis. Pastikan kembali ke area bersinyal agar sinkron.
+5. **Pencahayaan**: scan barcode butuh cahaya cukup. Bila kamera gagal, pakai input manual.
+
+### 10.10 FAQ PWA & Barcode
+
+**Q: Apakah perlu download dari Play Store / App Store?**
+A: Tidak. Cukup buka di browser HP lalu "Install"/"Add to Home Screen".
+
+**Q: Kamera tidak bisa dibuka, kenapa?**
+A: Pastikan (1) izin kamera diberikan, (2) aplikasi diakses lewat HTTPS atau localhost. Bila tetap gagal, gunakan **Input Kode Manual**.
+
+**Q: Data offline saya hilang tidak?**
+A: Tidak. Tersimpan aman di HP (IndexedDB) dan terkirim otomatis saat online. Hanya dihapus setelah server menerima.
+
+**Q: Kenapa Penerimaan tidak bisa offline?**
+A: Penerimaan butuh validasi PO real-time (sisa qty, status PO) sehingga memerlukan koneksi.
+
+**Q: Format barcode apa yang didukung?**
+A: QR Code dan barcode 1D umum (EAN-13, Code 128, dll) lewat kamera.
+
+**Q: Apakah ada push notification ke HP?**
+A: Saat ini notifikasi tampil di dalam aplikasi (lonceng). Push notifikasi native ke HP direncanakan menyusul.
+
+---
+
 ## Glosarium
 
 | Istilah | Penjelasan |
@@ -2105,6 +2621,28 @@ A: Alert muncul di notification bell (in-app). Integrasi WhatsApp untuk alert ex
 | **At-Risk Value** | Nilai Rupiah dari batch yang mendekati expired, menunjukkan potensi kerugian |
 | **Auto-Expire** | Proses otomatis menandai batch yang sudah melewati tanggal expired sebagai waste |
 | **Perishable** | Bahan yang cepat rusak/busuk dan perlu tracking expiry (daging, sayur, susu) |
+| **Cabang (Branch)** | Lokasi dapur operasional yang punya stok dan transaksi sendiri |
+| **Master Shared** | Data yang dipakai bersama semua cabang (item, resep, supplier, kategori, satuan) |
+| **Stok Per-Cabang** | Jumlah stok yang dihitung terpisah untuk setiap cabang (tabel BranchStock) |
+| **Branch Switcher** | Pemilih cabang aktif di header yang menentukan data cabang mana yang ditampilkan |
+| **Cabang Aktif** | Cabang yang sedang dipilih; semua halaman & transaksi mengikuti cabang ini |
+| **Mode Konsolidasi** | Pilihan "Semua Cabang" (Owner/Admin) yang menampilkan angka gabungan lintas cabang |
+| **Cabang Default** | Cabang utama; tujuan transaksi tanpa konteks dan tidak bisa dinonaktifkan |
+| **Transfer Stok** | Pemindahan stok antar cabang lewat alur Diminta → Disetujui → Dikirim → Diterima |
+| **TRF_OUT / TRF_IN** | Jenis mutasi stok keluar (cabang asal) / masuk (cabang tujuan) akibat transfer |
+| **Vendor Portal** | Portal web terpisah untuk supplier, diakses lewat `/portal/login` |
+| **SupplierUser** | Akun login khusus supplier untuk mengakses Vendor Portal |
+| **Shipment Status** | Status pengiriman yang diupdate supplier (PENDING → ACKNOWLEDGED → PREPARING → SHIPPED → DELIVERED), independen dari status PO |
+| **Katalog Harga** | Daftar harga bahan yang di-maintain oleh supplier lewat portal |
+| **Invoice Source** | Penanda asal invoice: INTERNAL (diinput staf) atau SUPPLIER (dari Vendor Portal) |
+| **PWA** | Progressive Web App — aplikasi web yang bisa diinstall ke HP tanpa app store dan jalan offline |
+| **Service Worker** | Skrip latar belang di browser yang menangani cache & akses offline |
+| **Manifest** | Berkas konfigurasi PWA (nama, ikon, warna) yang membuat aplikasi installable |
+| **Offline-capable** | Kemampuan input data (opname/produksi) saat tanpa internet, disimpan lokal lalu dikirim saat online |
+| **Outbox** | Antrian lokal (IndexedDB) berisi data yang dibuat offline, menunggu dikirim ke server |
+| **Background Sync** | Mekanisme browser untuk mengirim ulang data antrian otomatis saat koneksi kembali |
+| **Barcode** | Kode batang/QR pada kemasan barang yang bisa di-scan kamera untuk identifikasi item cepat |
+| **Item Lookup** | Pencarian item lewat scan barcode/SKU untuk melihat stok & histori |
 
 ---
 

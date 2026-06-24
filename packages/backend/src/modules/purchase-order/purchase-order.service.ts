@@ -8,9 +8,10 @@ import { Decimal } from '@prisma/client/runtime/library';
 export class PurchaseOrderService {
   constructor(private prisma: PrismaService) {}
 
-  async findAll(page: number, perPage: number, search?: string, status?: string, supplierId?: number) {
+  async findAll(branchId: number | null, page: number, perPage: number, search?: string, status?: string, supplierId?: number) {
     const { skip, take } = paginate(page, perPage);
     const where: any = {};
+    if (branchId) where.branchId = branchId;
     if (search) {
       where.OR = [
         { poNumber: { contains: search } },
@@ -52,13 +53,17 @@ export class PurchaseOrderService {
             unit: true,
           },
         },
+        shipmentUpdates: {
+          orderBy: { createdAt: 'desc' },
+          include: { createdBy: { select: { id: true, name: true } } },
+        },
       },
     });
     if (!po) throw new NotFoundException('Purchase Order tidak ditemukan');
     return po;
   }
 
-  async create(data: any, userId: number) {
+  async create(branchId: number, data: any, userId: number) {
     const poNumber = await generateDocNumber(this.prisma, 'PO', 'purchase_orders', 'po_number');
 
     let totalAmount = new Decimal(0);
@@ -78,6 +83,7 @@ export class PurchaseOrderService {
     return this.prisma.purchaseOrder.create({
       data: {
         poNumber,
+        branchId,
         supplierId: data.supplierId,
         poDate: new Date(data.poDate),
         expectedDate: data.expectedDate ? new Date(data.expectedDate) : null,

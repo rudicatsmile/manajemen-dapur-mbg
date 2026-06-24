@@ -72,31 +72,60 @@ async function main() {
     });
   }
 
+  // Branches
+  const branchSeed = [
+    { code: 'PST', name: 'Cabang Pusat', address: 'Jl. Pusat No. 1, Jakarta', isDefault: true },
+    { code: 'CBG-SLT', name: 'Cabang Selatan', address: 'Jl. Selatan No. 10, Jakarta', isDefault: false },
+  ];
+  const createdBranches: Record<string, number> = {};
+  for (const b of branchSeed) {
+    const result = await prisma.branch.upsert({
+      where: { code: b.code },
+      update: { name: b.name, address: b.address, isDefault: b.isDefault },
+      create: { code: b.code, name: b.name, address: b.address, isDefault: b.isDefault },
+    });
+    createdBranches[b.code] = result.id;
+  }
+  const defaultBranchId = createdBranches['PST'];
+
   // Admin User
   const hashedPassword = await bcrypt.hash('password123', 10);
 
-  await prisma.user.upsert({
+  const admin = await prisma.user.upsert({
     where: { email: 'admin@mbg.com' },
-    update: {},
+    update: { defaultBranchId },
     create: {
       email: 'admin@mbg.com',
       passwordHash: hashedPassword,
       name: 'Administrator',
       role: 'ADMIN',
+      defaultBranchId,
     },
   });
 
   // Owner User
-  await prisma.user.upsert({
+  const owner = await prisma.user.upsert({
     where: { email: 'owner@mbg.com' },
-    update: {},
+    update: { defaultBranchId },
     create: {
       email: 'owner@mbg.com',
       passwordHash: hashedPassword,
       name: 'Owner MBG',
       role: 'OWNER',
+      defaultBranchId,
     },
   });
+
+  // Assign both users to all branches (owner & admin akses semua cabang)
+  for (const userId of [admin.id, owner.id]) {
+    for (const branchId of Object.values(createdBranches)) {
+      await prisma.userBranch.upsert({
+        where: { userId_branchId: { userId, branchId } },
+        update: {},
+        create: { userId, branchId },
+      });
+    }
+  }
 
   console.log('Seed completed successfully');
 }

@@ -13,6 +13,12 @@ const statusMap: Record<string, { label: string; variant: 'default' | 'secondary
   PLANNED: { label: 'Direncanakan', variant: 'secondary' },
   PENDING: { label: 'Menunggu', variant: 'warning' },
   VERIFIED: { label: 'Terverifikasi', variant: 'success' },
+  REQUESTED: { label: 'Diminta', variant: 'warning' },
+  SHIPPED: { label: 'Dikirim', variant: 'default' },
+  RECEIVED: { label: 'Diterima', variant: 'success' },
+  ACKNOWLEDGED: { label: 'Dikonfirmasi', variant: 'default' },
+  PREPARING: { label: 'Disiapkan', variant: 'warning' },
+  DELIVERED: { label: 'Terkirim ke Tujuan', variant: 'success' },
 };
 
 export function StatusBadge({ status }: { status: string }) {

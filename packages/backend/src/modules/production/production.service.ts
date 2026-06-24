@@ -2,15 +2,17 @@ import { Injectable, NotFoundException, BadRequestException } from '@nestjs/comm
 import { PrismaService } from '../../prisma/prisma.service';
 import { paginate, paginationMeta } from '../../common/helpers/pagination.helper';
 import { generateDocNumber } from '../../common/helpers/doc-number.helper';
+import { adjustBranchStock, getBranchStockQty } from '../../common/helpers/stock.helper';
 import { Decimal } from '@prisma/client/runtime/library';
 
 @Injectable()
 export class ProductionService {
   constructor(private prisma: PrismaService) {}
 
-  async findAll(page: number, perPage: number, search?: string, status?: string) {
+  async findAll(branchId: number | null, page: number, perPage: number, search?: string, status?: string) {
     const { skip, take } = paginate(page, perPage);
     const where: any = {};
+    if (branchId) where.branchId = branchId;
     if (search) {
       where.OR = [
         { productionNumber: { contains: search } },
@@ -49,7 +51,7 @@ export class ProductionService {
     return production;
   }
 
-  async checkStock(recipeId: number, qty: number) {
+  async checkStock(branchId: number, recipeId: number, qty: number) {
     const recipe = await this.prisma.recipe.findUnique({
       where: { id: recipeId },
       include: { items: { include: { item: true, unit: true } } },
@@ -57,23 +59,25 @@ export class ProductionService {
     if (!recipe) throw new NotFoundException('Resep tidak ditemukan');
 
     const multiplier = new Decimal(qty);
-    const result = recipe.items.map((ri) => {
-      const needed = new Decimal(ri.quantity).mul(multiplier);
-      const available = ri.item.currentStock;
-      return {
-        itemId: ri.itemId,
-        itemName: ri.item.name,
-        unitName: ri.unit.abbreviation,
-        needed: needed.toNumber(),
-        available: available.toNumber(),
-        sufficient: available.gte(needed),
-      };
-    });
+    const result = await Promise.all(
+      recipe.items.map(async (ri) => {
+        const needed = new Decimal(ri.quantity).mul(multiplier);
+        const available = new Decimal(await getBranchStockQty(this.prisma, branchId, ri.itemId));
+        return {
+          itemId: ri.itemId,
+          itemName: ri.item.name,
+          unitName: ri.unit.abbreviation,
+          needed: needed.toNumber(),
+          available: available.toNumber(),
+          sufficient: available.gte(needed),
+        };
+      }),
+    );
 
     return result;
   }
 
-  async create(data: any, userId: number) {
+  async create(branchId: number, data: any, userId: number) {
     const recipe = await this.prisma.recipe.findUnique({
       where: { id: data.recipeId },
       include: { items: { include: { item: true } } },
@@ -82,13 +86,14 @@ export class ProductionService {
 
     const multiplier = new Decimal(data.plannedQty);
 
-    // Check stock availability
+    // Cek kecukupan stok pada cabang aktif
     if (!data.forceCreate) {
       for (const ri of recipe.items) {
         const needed = new Decimal(ri.quantity).mul(multiplier);
-        if (ri.item.currentStock.lessThan(needed)) {
+        const available = new Decimal(await getBranchStockQty(this.prisma, branchId, ri.itemId));
+        if (available.lessThan(needed)) {
           throw new BadRequestException(
-            `Stok ${ri.item.name} tidak mencukupi. Dibutuhkan: ${needed.toNumber()}, Tersedia: ${ri.item.currentStock.toNumber()}`,
+            `Stok ${ri.item.name} tidak mencukupi di cabang ini. Dibutuhkan: ${needed.toNumber()}, Tersedia: ${available.toNumber()}`,
           );
         }
       }
@@ -100,6 +105,7 @@ export class ProductionService {
       const production = await tx.production.create({
         data: {
           productionNumber,
+          branchId,
           productionDate: new Date(data.productionDate),
           recipeId: data.recipeId,
           plannedQty: data.plannedQty,
@@ -117,32 +123,18 @@ export class ProductionService {
         include: { recipe: true, items: { include: { item: true, unit: true } } },
       });
 
-      // Deduct stock
+      // Kurangi stok cabang + catat mutasi
       for (const ri of recipe.items) {
-        const item = await tx.item.findUnique({ where: { id: ri.itemId } });
-        if (!item) continue;
-
-        const qtyBefore = item.currentStock;
-        const qtyChange = new Decimal(ri.quantity).mul(multiplier).neg();
-        const qtyAfter = qtyBefore.add(qtyChange);
-
-        await tx.item.update({
-          where: { id: ri.itemId },
-          data: { currentStock: qtyAfter.lessThan(0) ? 0 : qtyAfter },
-        });
-
-        await tx.stockMovement.create({
-          data: {
-            itemId: ri.itemId,
-            movementType: 'PRD',
-            referenceType: 'PRODUCTION',
-            referenceId: production.id,
-            qtyBefore,
-            qtyChange,
-            qtyAfter: qtyAfter.lessThan(0) ? new Decimal(0) : qtyAfter,
-            notes: `Produksi ${productionNumber}`,
-            createdBy: userId,
-          },
+        const qtyChange = new Decimal(ri.quantity).mul(multiplier).toNumber();
+        await adjustBranchStock(tx, {
+          branchId,
+          itemId: ri.itemId,
+          qtyChange: -qtyChange,
+          movementType: 'PRD',
+          referenceType: 'PRODUCTION',
+          referenceId: production.id,
+          userId,
+          notes: `Produksi ${productionNumber}`,
         });
       }
 

@@ -23,6 +23,10 @@ import { PriceHistoryModule } from './modules/price-history/price-history.module
 import { ForecastingModule } from './modules/forecasting/forecasting.module';
 import { MealPlanModule } from './modules/meal-plan/meal-plan.module';
 import { BatchTrackingModule } from './modules/batch-tracking/batch-tracking.module';
+import { BranchModule } from './modules/branch/branch.module';
+import { StockTransferModule } from './modules/stock-transfer/stock-transfer.module';
+import { SupplierAuthModule } from './modules/supplier-auth/supplier-auth.module';
+import { SupplierPortalModule } from './modules/supplier-portal/supplier-portal.module';
 
 @Module({
   imports: [
@@ -50,6 +54,10 @@ import { BatchTrackingModule } from './modules/batch-tracking/batch-tracking.mod
     ForecastingModule,
     MealPlanModule,
     BatchTrackingModule,
+    BranchModule,
+    StockTransferModule,
+    SupplierAuthModule,
+    SupplierPortalModule,
   ],
 })
 export class AppModule {}

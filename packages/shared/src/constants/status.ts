@@ -43,9 +43,39 @@ export const MOVEMENT_TYPE = {
   ADJ_PLUS: 'ADJ_PLUS',
   ADJ_MINUS: 'ADJ_MINUS',
   WST: 'WST',
+  TRF_OUT: 'TRF_OUT',
+  TRF_IN: 'TRF_IN',
 } as const;
 
 export type MovementType = (typeof MOVEMENT_TYPE)[keyof typeof MOVEMENT_TYPE];
+
+export const TRANSFER_STATUS = {
+  REQUESTED: 'REQUESTED',
+  APPROVED: 'APPROVED',
+  REJECTED: 'REJECTED',
+  SHIPPED: 'SHIPPED',
+  RECEIVED: 'RECEIVED',
+  CANCELLED: 'CANCELLED',
+} as const;
+
+export type TransferStatus = (typeof TRANSFER_STATUS)[keyof typeof TRANSFER_STATUS];
+
+export const SHIPMENT_STATUS = {
+  PENDING: 'PENDING',
+  ACKNOWLEDGED: 'ACKNOWLEDGED',
+  PREPARING: 'PREPARING',
+  SHIPPED: 'SHIPPED',
+  DELIVERED: 'DELIVERED',
+} as const;
+
+export type ShipmentStatus = (typeof SHIPMENT_STATUS)[keyof typeof SHIPMENT_STATUS];
+
+export const INVOICE_SOURCE = {
+  INTERNAL: 'INTERNAL',
+  SUPPLIER: 'SUPPLIER',
+} as const;
+
+export type InvoiceSource = (typeof INVOICE_SOURCE)[keyof typeof INVOICE_SOURCE];
 
 export const WASTE_CATEGORY = {
   EXPIRED: 'EXPIRED',

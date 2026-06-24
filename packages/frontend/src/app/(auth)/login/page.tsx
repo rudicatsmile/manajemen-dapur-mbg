@@ -1,6 +1,7 @@
 'use client';
 
 import { useRouter } from 'next/navigation';
+import Link from 'next/link';
 import { useForm } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
 import { loginSchema, type LoginInput } from '@mbg/shared';
@@ -70,6 +71,12 @@ export default function LoginPage() {
             </Button>
           </form>
         </Form>
+        <div className="mt-4 text-center text-sm text-muted-foreground">
+          Supplier?{' '}
+          <Link href="/portal/login" className="text-primary hover:underline">
+            Masuk ke Portal Supplier
+          </Link>
+        </div>
       </CardContent>
     </Card>
   );

@@ -34,4 +34,9 @@ export class ReportController {
   async foodCost() {
     return this.reportService.foodCostReport();
   }
+
+  @Get('branch-comparison')
+  async branchComparison(@Query('from') from: string, @Query('to') to: string) {
+    return this.reportService.branchComparison(from, to);
+  }
 }
