@@ -53,6 +53,7 @@ model User {
   auditLogs                AuditLog[]
   notifications            Notification[]
   forecastsCreated         DemandForecast[]   @relation("ForecastCreator")
+  supplierMessagesFromUser SupplierMessage[]  @relation("MessageByUser")
 
   @@map("users")
 }
@@ -142,6 +143,7 @@ model UnitOfMeasure {
   stockTransferItems StockTransferItem[]
   conversionsFrom    UnitConversion[]    @relation("FromUnit")
   conversionsTo      UnitConversion[]    @relation("ToUnit")
+  supplierPrices     SupplierItemPrice[]
 
   @@map("units_of_measure")
 }
@@ -172,16 +174,83 @@ model Supplier {
   createdAt     DateTime @default(now()) @map("created_at")
   updatedAt     DateTime @updatedAt @map("updated_at")
 
-  purchaseOrders   PurchaseOrder[]
-  purchaseInvoices PurchaseInvoice[]
-  priceHistory     PriceHistory[]
+  purchaseOrders    PurchaseOrder[]
+  purchaseInvoices  PurchaseInvoice[]
+  priceHistory      PriceHistory[]
+  supplierUsers     SupplierUser[]
+  supplierPrices    SupplierItemPrice[]
+  supplierMessages  SupplierMessage[]
 
   @@map("suppliers")
+}
+
+model SupplierUser {
+  id           Int       @id @default(autoincrement())
+  supplierId   Int       @map("supplier_id")
+  email        String    @unique @db.VarChar(255)
+  passwordHash String    @map("password_hash") @db.VarChar(255)
+  name         String    @db.VarChar(100)
+  isActive     Boolean   @default(true) @map("is_active")
+  lastLoginAt  DateTime? @map("last_login_at")
+  createdAt    DateTime  @default(now()) @map("created_at")
+  updatedAt    DateTime  @updatedAt @map("updated_at")
+
+  supplier Supplier @relation(fields: [supplierId], references: [id], onDelete: Cascade)
+
+  shipmentUpdates   PoShipmentUpdate[]
+  invoicesSubmitted  PurchaseInvoice[]    @relation("InvoiceSubmittedBySupplier")
+  messagesFromPortal SupplierMessage[]    @relation("MessageBySupplierUser")
+
+  @@index([supplierId])
+  @@map("supplier_users")
+}
+
+model SupplierItemPrice {
+  id            Int       @id @default(autoincrement())
+  supplierId    Int       @map("supplier_id")
+  itemId        Int       @map("item_id")
+  unitId        Int?      @map("unit_id")
+  price         Decimal   @db.Decimal(15, 2)
+  effectiveDate DateTime  @map("effective_date") @db.Date
+  validUntil    DateTime? @map("valid_until") @db.Date
+  isActive      Boolean   @default(true) @map("is_active")
+  note          String?   @db.Text
+  createdAt     DateTime  @default(now()) @map("created_at")
+
+  supplier Supplier       @relation(fields: [supplierId], references: [id], onDelete: Cascade)
+  item     Item           @relation(fields: [itemId], references: [id])
+  unit     UnitOfMeasure? @relation(fields: [unitId], references: [id])
+
+  @@index([supplierId])
+  @@index([itemId])
+  @@map("supplier_item_prices")
+}
+
+model SupplierMessage {
+  id                    Int      @id @default(autoincrement())
+  supplierId            Int      @map("supplier_id")
+  poId                  Int?     @map("po_id")
+  senderType            String   @map("sender_type") @db.VarChar(20)
+  senderUserId          Int?     @map("sender_user_id")
+  senderSupplierUserId  Int?     @map("sender_supplier_user_id")
+  body                  String   @db.Text
+  readByInternal        Boolean  @default(false) @map("read_by_internal")
+  readBySupplier        Boolean  @default(false) @map("read_by_supplier")
+  createdAt             DateTime @default(now()) @map("created_at")
+
+  supplier     Supplier      @relation(fields: [supplierId], references: [id], onDelete: Cascade)
+  purchaseOrder PurchaseOrder? @relation(fields: [poId], references: [id])
+  senderUser   User?          @relation("MessageByUser", fields: [senderUserId], references: [id])
+  senderSupplierUser SupplierUser? @relation("MessageBySupplierUser", fields: [senderSupplierUserId], references: [id])
+
+  @@index([supplierId, createdAt])
+  @@map("supplier_messages")
 }
 
 model Item {
   id               Int      @id @default(autoincrement())
   sku              String   @unique @db.VarChar(50)
+  barcode          String?  @unique @db.VarChar(100)
   name             String   @db.VarChar(200)
   categoryId       Int      @map("category_id")
   baseUnitId       Int      @map("base_unit_id")
@@ -212,6 +281,7 @@ model Item {
   batches            ItemBatch[]
   branchStocks       BranchStock[]
   stockTransferItems StockTransferItem[]
+  supplierPrices     SupplierItemPrice[]
 
   @@index([categoryId])
   @@index([sku])
@@ -226,28 +296,49 @@ model PurchaseOrder {
   poDate       DateTime  @map("po_date") @db.Date
   expectedDate DateTime? @map("expected_date") @db.Date
   status       String    @default("DRAFT") @db.VarChar(30)
-  totalAmount  Decimal   @default(0) @map("total_amount") @db.Decimal(15, 2)
-  notes        String?   @db.Text
-  approvedBy   Int?      @map("approved_by")
-  approvedAt   DateTime? @map("approved_at")
-  createdBy    Int       @map("created_by")
-  createdAt    DateTime  @default(now()) @map("created_at")
-  updatedAt    DateTime  @updatedAt @map("updated_at")
+  totalAmount    Decimal   @default(0) @map("total_amount") @db.Decimal(15, 2)
+  notes          String?   @db.Text
+  shipmentStatus String    @default("PENDING") @map("shipment_status") @db.VarChar(30)
+  shipmentNote   String?   @map("shipment_note") @db.Text
+  shippedAt      DateTime? @map("shipped_at")
+  approvedBy     Int?      @map("approved_by")
+  approvedAt     DateTime? @map("approved_at")
+  createdBy      Int       @map("created_by")
+  createdAt      DateTime  @default(now()) @map("created_at")
+  updatedAt      DateTime  @updatedAt @map("updated_at")
 
   branch   Branch   @relation(fields: [branchId], references: [id])
   supplier Supplier @relation(fields: [supplierId], references: [id])
   approver User?    @relation("ApprovedByUser", fields: [approvedBy], references: [id])
   creator  User     @relation("CreatedByUser", fields: [createdBy], references: [id])
 
-  items      PurchaseOrderItem[]
-  receivings Receiving[]
-  invoices   PurchaseInvoice[]
+  items            PurchaseOrderItem[]
+  receivings       Receiving[]
+  invoices         PurchaseInvoice[]
+  shipmentUpdates  PoShipmentUpdate[]
+  supplierMessages SupplierMessage[]
 
   @@index([branchId])
   @@index([supplierId])
   @@index([status])
   @@index([poDate])
   @@map("purchase_orders")
+}
+
+model PoShipmentUpdate {
+  id                    Int      @id @default(autoincrement())
+  poId                  Int      @map("po_id")
+  status                String   @db.VarChar(30)
+  note                  String?  @db.Text
+  eta                   DateTime? @db.Date
+  createdBySupplierUserId Int    @map("created_by_supplier_user_id")
+  createdAt             DateTime @default(now()) @map("created_at")
+
+  purchaseOrder PurchaseOrder @relation(fields: [poId], references: [id], onDelete: Cascade)
+  createdBy     SupplierUser  @relation(fields: [createdBySupplierUserId], references: [id])
+
+  @@index([poId])
+  @@map("po_shipment_updates")
 }
 
 model PurchaseOrderItem {
@@ -310,23 +401,26 @@ model ReceivingItem {
 }
 
 model PurchaseInvoice {
-  id            Int      @id @default(autoincrement())
-  invoiceNumber String   @map("invoice_number") @db.VarChar(100)
-  poId          Int?     @map("po_id")
-  supplierId    Int      @map("supplier_id")
-  invoiceDate   DateTime @map("invoice_date") @db.Date
-  totalAmount   Decimal  @map("total_amount") @db.Decimal(15, 2)
-  imageUrl      String?  @map("image_url") @db.VarChar(500)
-  status        String   @default("PENDING") @db.VarChar(30)
-  verifiedBy    Int?     @map("verified_by")
-  notes         String?  @db.Text
-  createdBy     Int      @map("created_by")
-  createdAt     DateTime @default(now()) @map("created_at")
+  id             Int      @id @default(autoincrement())
+  invoiceNumber  String   @map("invoice_number") @db.VarChar(100)
+  poId           Int?     @map("po_id")
+  supplierId     Int      @map("supplier_id")
+  invoiceDate    DateTime @map("invoice_date") @db.Date
+  totalAmount    Decimal  @map("total_amount") @db.Decimal(15, 2)
+  imageUrl       String?  @map("image_url") @db.VarChar(500)
+  status         String   @default("PENDING") @db.VarChar(30)
+  source         String   @default("INTERNAL") @db.VarChar(20)
+  supplierUserId Int?     @map("supplier_user_id")
+  verifiedBy     Int?     @map("verified_by")
+  notes          String?  @db.Text
+  createdBy      Int?     @map("created_by")
+  createdAt      DateTime @default(now()) @map("created_at")
 
   purchaseOrder PurchaseOrder? @relation(fields: [poId], references: [id])
   supplier      Supplier       @relation(fields: [supplierId], references: [id])
   verifier      User?          @relation("InvoiceVerifiedBy", fields: [verifiedBy], references: [id])
-  creator       User           @relation("InvoiceCreatedBy", fields: [createdBy], references: [id])
+  creator       User?          @relation("InvoiceCreatedBy", fields: [createdBy], references: [id])
+  submitter     SupplierUser?  @relation("InvoiceSubmittedBySupplier", fields: [supplierUserId], references: [id])
 
   @@index([supplierId])
   @@index([status])

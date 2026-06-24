@@ -9,6 +9,9 @@ import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { Skeleton } from '@/components/ui/skeleton';
 import { useSupplier } from '@/hooks/queries/use-suppliers';
+import { SupplierAccountsCard } from '@/components/pembelian/supplier-accounts-card';
+import { SupplierPricesCard } from '@/components/pembelian/supplier-prices-card';
+import { SupplierChatCard } from '@/components/pembelian/supplier-chat-card';
 
 export default function SupplierDetailPage({ params }: { params: Promise<{ id: string }> }) {
   const { id } = use(params);
@@ -64,6 +67,10 @@ export default function SupplierDetailPage({ params }: { params: Promise<{ id: s
           </dl>
         </CardContent>
       </Card>
+
+      <SupplierAccountsCard supplierId={Number(id)} />
+      <SupplierPricesCard supplierId={Number(id)} />
+      <SupplierChatCard supplierId={Number(id)} />
     </div>
   );
 }

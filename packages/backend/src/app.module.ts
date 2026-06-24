@@ -25,6 +25,8 @@ import { MealPlanModule } from './modules/meal-plan/meal-plan.module';
 import { BatchTrackingModule } from './modules/batch-tracking/batch-tracking.module';
 import { BranchModule } from './modules/branch/branch.module';
 import { StockTransferModule } from './modules/stock-transfer/stock-transfer.module';
+import { SupplierAuthModule } from './modules/supplier-auth/supplier-auth.module';
+import { SupplierPortalModule } from './modules/supplier-portal/supplier-portal.module';
 
 @Module({
   imports: [
@@ -54,6 +56,8 @@ import { StockTransferModule } from './modules/stock-transfer/stock-transfer.mod
     BatchTrackingModule,
     BranchModule,
     StockTransferModule,
+    SupplierAuthModule,
+    SupplierPortalModule,
   ],
 })
 export class AppModule {}

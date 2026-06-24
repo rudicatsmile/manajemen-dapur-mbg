@@ -53,6 +53,10 @@ export class PurchaseOrderService {
             unit: true,
           },
         },
+        shipmentUpdates: {
+          orderBy: { createdAt: 'desc' },
+          include: { createdBy: { select: { id: true, name: true } } },
+        },
       },
     });
     if (!po) throw new NotFoundException('Purchase Order tidak ditemukan');

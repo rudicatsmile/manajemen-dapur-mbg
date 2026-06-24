@@ -4,26 +4,26 @@ import { useRouter } from 'next/navigation';
 import Link from 'next/link';
 import { useForm } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
-import { loginSchema, type LoginInput } from '@mbg/shared';
-import { ChefHat, Loader2 } from 'lucide-react';
+import { supplierLoginSchema, type SupplierLoginInput } from '@mbg/shared';
+import { Store, Loader2 } from 'lucide-react';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Form, FormControl, FormField, FormItem, FormLabel, FormMessage } from '@/components/ui/form';
 import { Input } from '@/components/ui/input';
 import { Button } from '@/components/ui/button';
-import { useLogin } from '@/hooks/queries/use-auth';
+import { useSupplierLogin } from '@/hooks/queries/use-supplier-auth';
 
-export default function LoginPage() {
+export default function PortalLoginPage() {
   const router = useRouter();
-  const login = useLogin();
+  const login = useSupplierLogin();
 
-  const form = useForm<LoginInput>({
-    resolver: zodResolver(loginSchema),
+  const form = useForm<SupplierLoginInput>({
+    resolver: zodResolver(supplierLoginSchema),
     defaultValues: { email: '', password: '' },
   });
 
-  const onSubmit = (data: LoginInput) => {
+  const onSubmit = (data: SupplierLoginInput) => {
     login.mutate(data, {
-      onSuccess: () => router.push('/dashboard'),
+      onSuccess: () => router.push('/portal/dashboard'),
     });
   };
 
@@ -31,10 +31,10 @@ export default function LoginPage() {
     <Card className="w-full max-w-md">
       <CardHeader className="text-center">
         <div className="mx-auto mb-2 flex h-12 w-12 items-center justify-center rounded-full bg-primary/10">
-          <ChefHat className="h-6 w-6 text-primary" />
+          <Store className="h-6 w-6 text-primary" />
         </div>
-        <CardTitle className="text-2xl">Manajemen Dapur MBG</CardTitle>
-        <CardDescription>Masuk ke akun Anda untuk melanjutkan</CardDescription>
+        <CardTitle className="text-2xl">Portal Supplier</CardTitle>
+        <CardDescription>Masuk untuk melihat PO, kirim invoice, dan kelola harga</CardDescription>
       </CardHeader>
       <CardContent>
         <Form {...form}>
@@ -46,7 +46,7 @@ export default function LoginPage() {
                 <FormItem>
                   <FormLabel>Email</FormLabel>
                   <FormControl>
-                    <Input placeholder="email@contoh.com" type="email" {...field} />
+                    <Input placeholder="vendor@perusahaan.com" type="email" {...field} />
                   </FormControl>
                   <FormMessage />
                 </FormItem>
@@ -72,9 +72,9 @@ export default function LoginPage() {
           </form>
         </Form>
         <div className="mt-4 text-center text-sm text-muted-foreground">
-          Supplier?{' '}
-          <Link href="/portal/login" className="text-primary hover:underline">
-            Masuk ke Portal Supplier
+          Staf internal?{' '}
+          <Link href="/login" className="text-primary hover:underline">
+            Login di sini
           </Link>
         </div>
       </CardContent>

@@ -158,6 +158,24 @@ async function main() {
 
   console.log('✓ 5 suppliers');
 
+  // ─── 4b. SUPPLIER USERS (akun login Vendor Portal) ────────
+  const supplierUserData = [
+    { supplier: 'PT Sumber Makmur', email: 'vendor@sumbermakmur.com', name: 'Hendra (Sumber Makmur)' },
+    { supplier: 'CV Bahan Segar', email: 'vendor@bahansegar.com', name: 'Sari (Bahan Segar)' },
+  ];
+  for (const su of supplierUserData) {
+    await prisma.supplierUser.create({
+      data: {
+        supplierId: suppliers[su.supplier]!,
+        email: su.email,
+        name: su.name,
+        passwordHash: pw,
+      },
+    });
+  }
+
+  console.log('✓ 2 supplier users (vendor portal)');
+
   // ─── 5. ITEMS (25 bahan baku) ─────────────────────────────
   const itemsData: Array<{ sku: string; name: string; cat: string; unit: string; minStock: number; currentStock: number; lastPrice: number }> = [
     // Protein
@@ -195,10 +213,13 @@ async function main() {
   ];
 
   const items: Record<string, number> = {};
-  for (const it of itemsData) {
+  for (const [idx, it] of itemsData.entries()) {
+    // Barcode demo (mirip EAN-13 Indonesia, prefix 899) agar bisa di-scan di PWA.
+    const barcode = `899${String(2000000000 + idx).padStart(10, '0')}`;
     const r = await prisma.item.create({
       data: {
         sku: it.sku,
+        barcode,
         name: it.name,
         categoryId: cats[it.cat]!,
         baseUnitId: units[it.unit]!,
@@ -948,6 +969,9 @@ async function main() {
   console.log('  Admin:          admin@mbg.com     / password123');
   console.log('  Purchaser:      purchaser@mbg.com / password123');
   console.log('  Kitchen Manager: kitchen@mbg.com  / password123');
+  console.log('\nAkun Vendor Portal (/portal/login):');
+  console.log('  Supplier: vendor@sumbermakmur.com / password123');
+  console.log('  Supplier: vendor@bahansegar.com   / password123');
   console.log('\nData demo:');
   console.log('  4 users, 5 suppliers, 25 items, 10 resep');
   console.log('  11 PO (berbagai status), 8 receiving, 3 invoice');

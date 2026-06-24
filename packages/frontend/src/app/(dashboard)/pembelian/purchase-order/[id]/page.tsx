@@ -10,6 +10,7 @@ import { StatusBadge } from '@/components/shared/status-badge';
 import { ConfirmDialog } from '@/components/shared/confirm-dialog';
 import { usePurchaseOrder, useApprovePurchaseOrder, useRejectPurchaseOrder, useCancelPurchaseOrder } from '@/hooks/queries/use-purchase-orders';
 import { useAuthStore } from '@/stores/auth-store';
+import { Truck } from 'lucide-react';
 import { formatRupiah, formatDate } from '@/lib/utils';
 
 export default function PurchaseOrderDetailPage({ params }: { params: Promise<{ id: string }> }) {
@@ -71,6 +72,37 @@ export default function PurchaseOrderDetailPage({ params }: { params: Promise<{ 
           </CardContent>
         </Card>
       </div>
+      {/* ─── Shipment Status (dari Supplier) ─────────────────── */}
+      {po.shipmentStatus && po.shipmentStatus !== 'PENDING' && (
+        <Card>
+          <CardHeader>
+            <CardTitle className="text-base flex items-center gap-2">
+              <Truck className="h-4 w-4" />Status Pengiriman Supplier
+            </CardTitle>
+          </CardHeader>
+          <CardContent className="space-y-3">
+            <div className="flex items-center gap-2">
+              <span className="text-sm text-muted-foreground">Status saat ini:</span>
+              <StatusBadge status={po.shipmentStatus} />
+            </div>
+            {po.shipmentUpdates && po.shipmentUpdates.length > 0 && (
+              <div className="border-l-2 border-muted pl-4 space-y-3">
+                {(po.shipmentUpdates as Array<{ id: number; status: string; note: string | null; eta: string | null; createdAt: string; createdBy?: { name: string } }>).map((u) => (
+                  <div key={u.id} className="text-sm">
+                    <div className="flex items-center gap-2">
+                      <StatusBadge status={u.status} />
+                      <span className="text-xs text-muted-foreground">{new Date(u.createdAt).toLocaleString('id-ID')}</span>
+                    </div>
+                    {u.note && <p className="mt-1 text-muted-foreground">{u.note}</p>}
+                    {u.eta && <p className="text-xs text-muted-foreground">ETA: {formatDate(u.eta)}</p>}
+                  </div>
+                ))}
+              </div>
+            )}
+          </CardContent>
+        </Card>
+      )}
+
       {(po.status === 'PENDING_APPROVAL' && isAdmin) && (
         <div className="flex gap-2">
           <ConfirmDialog title="Setujui PO?" description="PO akan disetujui dan bisa diproses." onConfirm={() => approve.mutate(poId)}>
