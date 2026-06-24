@@ -6,6 +6,7 @@ import { useAuthStore } from '@/stores/auth-store';
 import { useBranchStore } from '@/stores/branch-store';
 import { BranchSwitcher } from './branch-switcher';
 import { MobileSidebar } from './sidebar';
+import { PendingSyncIndicator } from '@/components/pwa/pending-sync-indicator';
 import { Avatar, AvatarFallback } from '@/components/ui/avatar';
 import {
   DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuLabel,
@@ -33,6 +34,7 @@ export function Header() {
     <header className="sticky top-0 z-40 flex h-14 items-center gap-4 border-b bg-background px-4 lg:px-6">
       <MobileSidebar />
       <div className="flex-1" />
+      <PendingSyncIndicator />
       <BranchSwitcher />
       <NotificationBell />
       <DropdownMenu>

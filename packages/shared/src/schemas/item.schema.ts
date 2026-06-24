@@ -2,6 +2,7 @@ import { z } from 'zod';
 
 export const createItemSchema = z.object({
   name: z.string().min(1).max(200),
+  barcode: z.string().max(100).optional(),
   categoryId: z.number().int().positive(),
   baseUnitId: z.number().int().positive(),
   purchaseUnitId: z.number().int().positive().optional(),

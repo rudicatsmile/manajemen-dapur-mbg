@@ -4,6 +4,8 @@ import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import apiClient from '@/lib/api-client';
 import { toast } from 'sonner';
 import type { CreateProductionInput } from '@mbg/shared';
+import { enqueue } from '@/lib/offline-outbox';
+import { isNetworkError } from '@/lib/utils';
 
 const QUERY_KEY = ['productions'] as const;
 
@@ -32,13 +34,29 @@ export function useCreateProduction() {
   const qc = useQueryClient();
   return useMutation({
     mutationFn: async (data: CreateProductionInput) => {
-      const res = await apiClient.post('/productions', data);
-      return res.data;
+      if (typeof navigator !== 'undefined' && !navigator.onLine) {
+        await enqueue({ path: '/productions', body: data, label: 'Produksi Harian' });
+        return { offline: true };
+      }
+      try {
+        const res = await apiClient.post('/productions', data);
+        return res.data;
+      } catch (err) {
+        if (isNetworkError(err)) {
+          await enqueue({ path: '/productions', body: data, label: 'Produksi Harian' });
+          return { offline: true };
+        }
+        throw err;
+      }
     },
-    onSuccess: () => {
+    onSuccess: (result) => {
       qc.invalidateQueries({ queryKey: QUERY_KEY });
       qc.invalidateQueries({ queryKey: ['stock'] });
-      toast.success('Produksi berhasil dicatat');
+      if (result?.offline) {
+        toast.success('Disimpan offline — akan dikirim otomatis saat online');
+      } else {
+        toast.success('Produksi berhasil dicatat');
+      }
     },
   });
 }

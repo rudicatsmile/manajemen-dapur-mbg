@@ -30,6 +30,11 @@ export class ItemController {
     );
   }
 
+  @Get('lookup')
+  async lookup(@Query('code') code: string, @CurrentBranch() branch: BranchContext) {
+    return this.itemService.lookupByCode(code ?? '', branch.branchId);
+  }
+
   @Get(':id')
   async findById(@Param('id', ParseIntPipe) id: number, @CurrentBranch() branch: BranchContext) {
     return this.itemService.findById(id, branch.branchId);

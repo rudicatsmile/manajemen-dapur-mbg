@@ -1,0 +1,15 @@
+<svg width="512" height="512" viewBox="0 0 512 512" xmlns="http://www.w3.org/2000/svg">
+  <rect width="512" height="512" rx="96" fill="#16a34a"/>
+  <!-- Chef hat, kept within the maskable safe zone (center ~60%) -->
+  <g transform="translate(256 256)" fill="#ffffff">
+    <path d="M-92 -40
+             a92 92 0 0 1 184 0
+             a64 64 0 0 1 -22 122
+             l0 8
+             l-140 0
+             l0 -8
+             a64 64 0 0 1 -22 -122
+             z"/>
+    <rect x="-104" y="96" width="208" height="40" rx="12"/>
+  </g>
+</svg>

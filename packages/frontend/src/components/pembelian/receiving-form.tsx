@@ -4,15 +4,18 @@ import { useRouter } from 'next/navigation';
 import { useForm, useFieldArray } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
 import { createReceivingSchema, type CreateReceivingInput } from '@mbg/shared';
-import { Loader2 } from 'lucide-react';
+import { Loader2, ScanLine } from 'lucide-react';
+import { toast } from 'sonner';
 import { Card, CardContent } from '@/components/ui/card';
 import { Form, FormControl, FormField, FormItem, FormLabel, FormMessage } from '@/components/ui/form';
 import { Input } from '@/components/ui/input';
 import { Textarea } from '@/components/ui/textarea';
 import { Button } from '@/components/ui/button';
 import { Combobox } from '@/components/shared/combobox';
+import { BarcodeScanner } from '@/components/shared/barcode-scanner';
 import { usePurchaseOrderList, usePurchaseOrder } from '@/hooks/queries/use-purchase-orders';
 import { useCreateReceiving } from '@/hooks/queries/use-receivings';
+import { lookupItemByCode } from '@/hooks/queries/use-item-lookup';
 import { formatDateInput } from '@/lib/utils';
 import { useState, useEffect } from 'react';
 
@@ -36,6 +39,28 @@ export function ReceivingForm() {
   });
 
   const { fields, replace } = useFieldArray({ control: form.control, name: 'items' });
+  const [scannerOpen, setScannerOpen] = useState(false);
+
+  const handleScan = async (code: string) => {
+    if (!poDetail?.items) {
+      toast.error('Pilih PO terlebih dahulu');
+      return;
+    }
+    const item = await lookupItemByCode(code);
+    if (!item) {
+      toast.error(`Item dengan kode "${code}" tidak ditemukan`);
+      return;
+    }
+    const lineIndex = poDetail.items.findIndex((pi: { itemId: number }) => pi.itemId === item.id);
+    if (lineIndex < 0) {
+      toast.error(`${item.name} tidak ada di PO ini`);
+      return;
+    }
+    const el = document.querySelector<HTMLInputElement>(`[name="items.${lineIndex}.quantity"]`);
+    el?.focus();
+    el?.scrollIntoView({ behavior: 'smooth', block: 'center' });
+    toast.success(`${item.name} — masukkan qty diterima`);
+  };
 
   useEffect(() => {
     if (poDetail?.items) {
@@ -59,6 +84,7 @@ export function ReceivingForm() {
 
   return (
     <Card>
+      <BarcodeScanner open={scannerOpen} onOpenChange={setScannerOpen} onDetected={handleScan} title="Scan Item Penerimaan" />
       <CardContent className="pt-6">
         <Form {...form}>
           <form onSubmit={form.handleSubmit(onSubmit)} className="space-y-6">
@@ -88,7 +114,12 @@ export function ReceivingForm() {
 
             {fields.length > 0 && (
               <div className="space-y-3">
-                <h3 className="font-semibold">Item</h3>
+                <div className="flex items-center justify-between">
+                  <h3 className="font-semibold">Item</h3>
+                  <Button type="button" variant="outline" size="sm" onClick={() => setScannerOpen(true)}>
+                    <ScanLine className="mr-2 h-4 w-4" />Scan untuk Isi
+                  </Button>
+                </div>
                 {fields.map((field, index) => {
                   const poItem = poDetail?.items?.[index];
                   return (

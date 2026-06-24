@@ -21,6 +21,7 @@ export class ItemService {
       where.OR = [
         { name: { contains: search } },
         { sku: { contains: search } },
+        { barcode: { contains: search } },
       ];
     }
     if (categoryId) {
@@ -89,6 +90,37 @@ export class ItemService {
     return this.withBranchStock(item, branchId);
   }
 
+  /** Lookup item via barcode atau SKU (untuk scanner). Branch-scoped stok + mutasi terakhir. */
+  async lookupByCode(code: string, branchId: number | null) {
+    const trimmed = code.trim();
+    if (!trimmed) throw new NotFoundException('Kode tidak boleh kosong');
+
+    const item = await this.prisma.item.findFirst({
+      where: {
+        isActive: true,
+        OR: [{ barcode: trimmed }, { sku: trimmed }],
+      },
+      include: {
+        category: true,
+        baseUnit: true,
+        purchaseUnit: true,
+        branchStocks: branchId ? { where: { branchId } } : true,
+      },
+    });
+    if (!item) throw new NotFoundException(`Item dengan kode "${trimmed}" tidak ditemukan`);
+
+    const withStock = this.withBranchStock(item, branchId);
+
+    const movements = await this.prisma.stockMovement.findMany({
+      where: branchId ? { itemId: item.id, branchId } : { itemId: item.id },
+      orderBy: { createdAt: 'desc' },
+      take: 5,
+      include: { creator: { select: { id: true, name: true } } },
+    });
+
+    return { ...withStock, recentMovements: movements };
+  }
+
   async create(data: any) {
     const category = await this.prisma.category.findUnique({ where: { id: data.categoryId } });
     if (!category) throw new NotFoundException('Kategori tidak ditemukan');
@@ -111,6 +143,7 @@ export class ItemService {
     return this.prisma.item.create({
       data: {
         sku,
+        barcode: data.barcode || null,
         name: data.name,
         categoryId: data.categoryId,
         baseUnitId: data.baseUnitId,
@@ -131,6 +164,7 @@ export class ItemService {
       where: { id },
       data: {
         ...(data.name !== undefined && { name: data.name }),
+        ...(data.barcode !== undefined && { barcode: data.barcode || null }),
         ...(data.categoryId !== undefined && { categoryId: data.categoryId }),
         ...(data.baseUnitId !== undefined && { baseUnitId: data.baseUnitId }),
         ...(data.purchaseUnitId !== undefined && { purchaseUnitId: data.purchaseUnitId }),
